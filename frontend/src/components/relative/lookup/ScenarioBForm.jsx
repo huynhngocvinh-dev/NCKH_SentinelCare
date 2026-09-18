@@ -136,8 +136,7 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Số điện thoại nhận SMS/Gọi:{" "}
-              <span className="text-slate-400 font-normal">(Tùy chọn)</span>
+              Số điện thoại nhận SMS/Gọi:
             </label>
             <input
               type="text"

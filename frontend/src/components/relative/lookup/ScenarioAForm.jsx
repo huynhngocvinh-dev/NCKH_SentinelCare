@@ -1,24 +1,59 @@
 import React, { useState } from "react";
 import { FiCheckCircle, FiUserPlus } from "react-icons/fi";
+import { toast } from "react-toastify";
 
-export default function ScenarioAForm({ phoneNumber, onSubmitSuccess }) {
+const API_BASE = "http://localhost:8080/api/emergency-contacts";
+
+export default function ScenarioAForm({
+  phoneNumber,
+  userData,
+  onSubmitSuccess,
+}) {
   const [escalationLevel, setEscalationLevel] = useState("2");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newRelative = {
-      id: Date.now(),
-      name: "Anh Nam (Nguyễn Hải Nam)",
-      role: "Người nhận chính",
-      roleBadgeStyle: "bg-blue-100 text-blue-700",
-      statusText: "Đã nhận",
-      phone: phoneNumber,
-      email: "nam@email.com",
-      channelDesc: `Kích hoạt sau ${
-        escalationLevel === "2" ? "25s" : "50s"
-      } nếu cấp trên chưa phản hồi`,
+    setSubmitting(true);
+
+    const payload = {
+      fullName: userData?.contactName || "Người thân SentinelCare",
+      email: userData?.email || "user@sentinelcare.com",
+      activationPhone: phoneNumber,
+      relationship: "Người nhận chính",
+      priorityOrder: parseInt(escalationLevel, 10),
     };
-    onSubmitSuccess(newRelative);
+
+    try {
+      const res = await fetch(API_BASE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const savedContact = await res.json();
+        toast.success("Đã lưu Người nhận cảnh báo vào CSDL MySQL!");
+        onSubmitSuccess({
+          id: savedContact.id,
+          name: savedContact.contactName,
+          role: savedContact.relationship,
+          roleBadgeStyle: "bg-blue-100 text-blue-700",
+          statusText: "Đã nhận",
+          phone: savedContact.phoneNumber,
+          email: savedContact.email,
+          channelDesc: `Kích hoạt sau ${
+            escalationLevel === "2" ? "25s" : "50s"
+          } nếu cấp trên chưa phản hồi`,
+        });
+      } else {
+        throw new Error();
+      }
+    } catch (err) {
+      toast.error("Lỗi khi lưu dữ liệu vào Backend!");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -32,33 +67,42 @@ export default function ScenarioAForm({ phoneNumber, onSubmitSuccess }) {
 
       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-slate-300 text-slate-700 font-bold text-sm flex items-center justify-center">
-            AN
+          <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-bold text-sm flex items-center justify-center">
+            {userData?.contactName
+              ? userData.contactName.charAt(0).toUpperCase()
+              : "SC"}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h4 className="font-bold text-sm text-slate-900">
-                Anh Nam (Nguyễn Hải Nam)
+                {userData?.contactName || "Tài khoản SentinelCare"}
               </h4>
               <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded">
-                Tài khoản cá nhân
+                Đã xác thực
               </span>
             </div>
-            <p className="text-xs text-slate-500">nam@email.com</p>
+            <p className="text-xs text-slate-500">
+              {userData?.email || "Chưa cập nhật email"}
+            </p>
           </div>
         </div>
 
         <div className="text-[11px] font-bold text-emerald-600 bg-emerald-100/60 px-2.5 py-1 rounded-lg">
-          🔔 Đang cài đặt app & Bật thông báo đẩy thời gian thực
+          🔔 Sẵn sàng nhận Push App & SMS
         </div>
       </div>
 
       <button
         type="submit"
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+        disabled={submitting}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50"
       >
         <FiUserPlus className="w-4 h-4" />
-        <span>+ Thêm Người nhận cảnh báo</span>
+        <span>
+          {submitting
+            ? "Đang lưu..."
+            : "+ Thêm Người nhận cảnh báo (Hoàn tất 1-chạm)"}
+        </span>
       </button>
     </form>
   );

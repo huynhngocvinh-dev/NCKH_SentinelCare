@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 
 import RelativeHeader from "../components/relative/RelativeHeader";
@@ -8,54 +8,55 @@ import RelativeList from "../components/relative/RelativeList";
 import LookupAndAddForm from "../components/relative/LookupAndAddForm";
 import GeneralSettings from "../components/relative/GeneralSettings";
 
-const INITIAL_RELATIVES = [
-  {
-    id: 1,
-    name: "Mẹ (Bạn)",
-    role: "Chủ tài khoản",
-    roleBadgeStyle: "bg-blue-600 text-white",
-    statusText: "Đã nhận",
-    phone: "0912 345 678",
-    email: "me@email.com",
-    channelDesc: "App + SMS + Cuộc gọi lập tức (0s - Tức thì)",
-  },
-  {
-    id: 2,
-    name: "Anh Nam (Nguyễn Hải Nam)",
-    role: "Người nhận chính",
-    roleBadgeStyle: "bg-blue-100 text-blue-700",
-    statusText: "Đã nhận",
-    phone: "0987 654 321",
-    email: "nam@email.com",
-    channelDesc: "Kích hoạt sau 25s nếu Mẹ chưa xác nhận an toàn",
-  },
-  {
-    id: 3,
-    name: "Chị Lan",
-    role: "Người nhận phụ",
-    roleBadgeStyle: "bg-slate-200 text-slate-700",
-    statusText: "Đã nhận",
-    phone: "0909 876 543",
-    email: "lan@email.com",
-    channelDesc: "Kích hoạt sau 50s nếu 2 cấp trên chưa phản hồi",
-  },
-  {
-    id: 4,
-    name: "Bác Minh",
-    role: "Hàng xóm sao lưu (Phòng 205)",
-    roleBadgeStyle: "bg-slate-200 text-slate-700",
-    statusText: "Chưa nhận (SMS & Gọi)",
-    phone: "0933 111 222",
-    email: "minh@email.com",
-    channelDesc: "Cuộc gọi tự động AI & SMS báo động sau 90s",
-  },
-];
+const API_BASE = "http://localhost:8080/api/emergency-contacts";
 
 export default function RelativeManagementPage() {
-  const [relatives, setRelatives] = useState(INITIAL_RELATIVES);
+  const [relatives, setRelatives] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddRelative = (newRel) => {
-    setRelatives((prev) => [...prev, newRel]);
+  const fetchRelatives = async () => {
+    setLoading(true);
+    try {
+      const fgUser = JSON.parse(localStorage.getItem("fg_user") || "{}");
+      const token = fgUser.token;
+
+      if (!token) {
+        toast.warn("Vui lòng đăng nhập để xem danh sách người thân!");
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(API_BASE, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setRelatives(data);
+      } else if (res.status === 403) {
+        toast.error(
+          "Phiên đăng nhập hết hạn hoặc bị từ chối! Vui lòng đăng nhập lại."
+        );
+      } else {
+        toast.error("Không thể tải danh sách người thân từ hệ thống.");
+      }
+    } catch (err) {
+      toast.error("Lỗi kết nối tới máy chủ Backend!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRelatives();
+  }, []);
+
+  const handleAddRelativeSuccess = () => {
+    fetchRelatives();
   };
 
   const handleCall = (phone) => {
@@ -80,22 +81,28 @@ export default function RelativeManagementPage() {
 
         {/* Khung nội dung 2 Cột */}
         <div className="grid lg:grid-cols-12 gap-6">
-          {/* Cột trái (7 Cột): Danh sách thứ tự ưu tiên leo thang */}
+          {/* Cột trái: Danh sách người thân ưu tiên từ CSDL */}
           <div className="lg:col-span-7">
-            <RelativeList
-              relatives={relatives}
-              onCall={handleCall}
-              onSms={handleSms}
-            />
+            {loading ? (
+              <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 font-medium animate-pulse">
+                ⏳ Đang tải danh sách người thân...
+              </div>
+            ) : (
+              <RelativeList
+                relatives={relatives}
+                onCall={handleCall}
+                onSms={handleSms}
+              />
+            )}
           </div>
 
-          {/* Cột phải (5 Cột): Tra cứu & Thêm người nhận cảnh báo */}
+          {/* Cột phải: Tra cứu & Thêm người nhận cảnh báo */}
           <div className="lg:col-span-5">
-            <LookupAndAddForm onAddSuccess={handleAddRelative} />
+            <LookupAndAddForm onAddSuccess={handleAddRelativeSuccess} />
           </div>
         </div>
 
-        {/* Khung Cài Đặt Chung (Full-Width Chiếm Trọn Phía Dưới) */}
+        {/* Khung Cài Đặt Chung */}
         <GeneralSettings />
       </div>
     </div>

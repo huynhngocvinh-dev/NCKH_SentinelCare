@@ -1,12 +1,14 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { toast } from "react-toastify";
 import ScenarioAForm from "./lookup/ScenarioAForm";
 import ScenarioBForm from "./lookup/ScenarioBForm";
 import Step1PhoneLookup from "./lookup/Step1PhoneLookup";
 
+const API_BASE = "http://localhost:8080/api/emergency-contacts";
+
 const isValidVietnamesePhone = (phoneStr) => {
   const cleanPhone = phoneStr.replace(/\s+/g, "");
-  return /(^(0[3|5|7|8|9])+([0-9]{8})$)|(^\+84[3|5|7|8|9]+([0-9]{8})$)/.test(
+  return /(^(0[3|5|7|8|9])+([0-9]{8})$)\vert{}(^\+84[3\vert{}5\vert{}7\vert{}8\vert{}9]+([0-9]{8})$)/.test(
     cleanPhone
   );
 };
@@ -17,6 +19,7 @@ export default function LookupAndAddForm({ onAddSuccess }) {
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [phoneError, setPhoneError] = useState("");
+  const [foundUserData, setFoundUserData] = useState(null);
 
   const handleLookup = async () => {
     if (!phoneNumber.trim()) {
@@ -26,8 +29,8 @@ export default function LookupAndAddForm({ onAddSuccess }) {
     }
 
     if (!isValidVietnamesePhone(phoneNumber.trim())) {
-      setPhoneError("Số điện thoại không đúng định dạng!");
-      toast.error("Số điện thoại không đúng định dạng Việt Nam!");
+      setPhoneError("Số điện thoại không đúng định dạng Việt Nam!");
+      toast.error("Số điện thoại không đúng định dạng!");
       return;
     }
 
@@ -35,26 +38,35 @@ export default function LookupAndAddForm({ onAddSuccess }) {
     setSearching(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
       const cleanPhone = phoneNumber.replace(/\s+/g, "");
-      const lastDigit = parseInt(cleanPhone.slice(-1), 10);
-      const isAccountFound = !isNaN(lastDigit) && lastDigit % 2 === 0;
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(
+        `${API_BASE}/check-phone?phone=${encodeURIComponent(cleanPhone)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       setHasSearched(true);
 
-      if (isAccountFound) {
+      if (res.ok) {
+        const data = await res.json();
+        setFoundUserData(data);
         setActiveScenario("A");
-        toast.success(
-          `Đã tìm thấy tài khoản SentinelCare liên kết với số ${phoneNumber}!`
-        );
-      } else {
+        toast.success(`Đã tìm thấy tài khoản liên kết với số ${cleanPhone}!`);
+      } else if (res.status === 404) {
+        setFoundUserData(null);
         setActiveScenario("B");
-        toast.warn(
-          "Số điện thoại này chưa đăng ký tài khoản! Hệ thống đã chuyển sang biểu mẫu nhập thông tin dự phòng."
-        );
+        toast.warn("Số điện thoại này chưa đăng ký tài khoản!");
+      } else {
+        throw new Error("Lỗi hệ thống khi tra cứu!");
       }
     } catch (err) {
-      toast.error("Lỗi kết nối trạm kiểm soát!");
+      toast.error("Không thể kết nối tới máy chủ Backend (Spring Boot)!");
     } finally {
       setSearching(false);
     }
@@ -62,9 +74,9 @@ export default function LookupAndAddForm({ onAddSuccess }) {
 
   const handleSuccess = (newRelative) => {
     onAddSuccess(newRelative);
-    toast.success("Thêm người nhận cảnh báo thành công!");
     setHasSearched(false);
     setPhoneNumber("");
+    setFoundUserData(null);
   };
 
   return (
@@ -114,6 +126,7 @@ export default function LookupAndAddForm({ onAddSuccess }) {
           {activeScenario === "A" ? (
             <ScenarioAForm
               phoneNumber={phoneNumber}
+              userData={foundUserData}
               onSubmitSuccess={handleSuccess}
             />
           ) : (

@@ -20,13 +20,6 @@ export default function Dashboard() {
               SentinelCare
             </span>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <FiLogOut className="h-4 w-4" />
-            Đăng xuất
-          </button>
         </header>
 
         <div className="mt-8 rounded-2xl bg-white p-6 shadow-sm border border-slate-100">

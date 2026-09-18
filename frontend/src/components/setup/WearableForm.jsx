@@ -118,8 +118,9 @@ export default function WearableForm({
             <div className="relative">
               <FiCalendar className="absolute left-3 top-3 text-slate-400 w-4 h-4" />
               <input
-                type="date"
+                type="date" 
                 value={formData.subjectDob}
+                max={new Date().toISOString().split("T")[0]}
                 onChange={(e) => onChange("subjectDob", e.target.value)}
                 className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-blue-600"
               />

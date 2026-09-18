@@ -8,20 +8,17 @@ import {
   FiUsers,
   FiClock,
   FiUser,
+  FiLogOut,
 } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext"; // Tự động lấy Auth State từ Context
+import { useAuth } from "../../context/AuthContext";
 
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
 
-  // Hoặc nếu bạn muốn test giao diện thủ công không qua Context, có thể đổi thành:
-  // const isLoggedIn = true;
   const isLoggedIn = isAuthenticated || Boolean(user);
-
-  // Helper kiểm tra active route để highlight menu
   const isActive = (path) => location.pathname === path;
 
   return (
@@ -55,136 +52,142 @@ export default function Navbar() {
 
       {/* Main Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        {/* Logo Brand */}
-        <div
-          className="flex items-center gap-3 cursor-pointer"
-          onClick={() => navigate("/")}
-        >
-          <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-            <FiShield className="w-6 h-6 stroke-[2.5]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-black tracking-tight text-slate-900">
-                SentinelCare
-              </span>
-              <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
-                AI CORE
-              </span>
+        {/* KHU VỰC BÊN TRÁI: LOGO + MENU ĐI KÈM KẾ BÊN */}
+        <div className="flex items-center gap-8">
+          {/* Logo Brand */}
+          <div
+            className="flex items-center gap-3 cursor-pointer shrink-0"
+            onClick={() => navigate("/")}
+          >
+            <div className="w-11 h-11 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+              <FiShield className="w-6 h-6 stroke-[2.5]" />
             </div>
-            <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
-              Telecare Incident Core
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-black tracking-tight text-slate-900">
+                  SentinelCare
+                </span>
+                <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                  AI CORE
+                </span>
+              </div>
+              <p className="text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
+                Telecare Incident Core
+              </p>
+            </div>
           </div>
+
+          {/* Menu khi đã đăng nhập (Đứng ngay cạnh Logo) */}
+          {isLoggedIn && (
+            <nav className="flex items-center gap-1 sm:gap-2">
+              <button
+                onClick={() => navigate("/")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                  isActive("/")
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <FiHome className="w-4 h-4" />
+                <span>Trang chủ</span>
+              </button>
+
+              <button
+                onClick={() => navigate("/cai-dat-thiet-bi")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                  isActive("/cai-dat-thiet-bi")
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <FiCpu className="w-4 h-4" />
+                <span>Thiết bị</span>
+              </button>
+
+              <button
+                onClick={() => navigate("/nguoi-than")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                  isActive("/nguoi-than")
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <FiUsers className="w-4 h-4" />
+                <span>Người thân</span>
+              </button>
+
+              <button
+                onClick={() => navigate("/lich-su")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                  isActive("/lich-su")
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <FiClock className="w-4 h-4" />
+                <span>Lịch sử</span>
+              </button>
+            </nav>
+          )}
+
+          {/* Menu Landing Page khi chưa đăng nhập */}
+          {!isLoggedIn && (
+            <nav className="hidden lg:flex items-center gap-6 text-sm font-semibold text-slate-600">
+              <a
+                href="#giai-phap"
+                className="hover:text-blue-600 transition-colors"
+              >
+                Giải Pháp
+              </a>
+              <a
+                href="#cong-nghe"
+                className="hover:text-blue-600 transition-colors"
+              >
+                Công Nghệ Đa Luồng
+              </a>
+              <a
+                href="#grace-period"
+                className="hover:text-blue-600 transition-colors"
+              >
+                Chống Báo Giả 25s
+              </a>
+              <a
+                href="#phan-cap"
+                className="hover:text-blue-600 transition-colors"
+              >
+                Phân Cấp Cứu Hộ
+              </a>
+              <a
+                href="#bang-gia"
+                className="hover:text-blue-600 transition-colors"
+              >
+                Bảng Giá
+              </a>
+            </nav>
+          )}
         </div>
 
-        {/* Dynamic Navigation Links */}
-        {isLoggedIn ? (
-          /* ================= MENU KHI ĐÃ ĐĂNG NHẬP ================= */
-          <nav className="flex items-center gap-1 sm:gap-2">
-            <button
-              onClick={() => navigate("/")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
-                isActive("/")
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              <FiHome className="w-4 h-4" />
-              <span>Trang chủ</span>
-            </button>
-
-            <button
-              onClick={() => navigate("/cai-dat-thiet-bi")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
-                isActive("/cai-dat-thiet-bi")
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              <FiCpu className="w-4 h-4" />
-              <span>Thiết bị</span>
-            </button>
-
-            <button
-              onClick={() => navigate("/nguoi-than")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
-                isActive("/nguoi-than")
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              <FiUsers className="w-4 h-4" />
-              <span>Người thân</span>
-            </button>
-
-            <button
-              onClick={() => navigate("/lich-su")}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
-                isActive("/lich-su")
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
-              <FiClock className="w-4 h-4" />
-              <span>Lịch sử</span>
-            </button>
-          </nav>
-        ) : (
-          /* ================= MENU KHI CHƯA ĐĂNG NHẬP ================= */
-          <nav className="hidden lg:flex items-center gap-8 text-sm font-semibold text-slate-600">
-            <a
-              href="#giai-phap"
-              className="hover:text-blue-600 transition-colors"
-            >
-              Giải Pháp
-            </a>
-            <a
-              href="#cong-nghe"
-              className="hover:text-blue-600 transition-colors"
-            >
-              Công Nghệ Đa Luồng
-            </a>
-            <a
-              href="#grace-period"
-              className="hover:text-blue-600 transition-colors"
-            >
-              Chống Báo Giả 25s
-            </a>
-            <a
-              href="#phan-cap"
-              className="hover:text-blue-600 transition-colors"
-            >
-              Phân Cấp Cứu Hộ
-            </a>
-            <a
-              href="#bang-gia"
-              className="hover:text-blue-600 transition-colors"
-            >
-              Bảng Giá
-            </a>
-            <a
-              href="#demo-live"
-              className="text-blue-600 font-bold bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors"
-            >
-              Trải Nghiệm Live Demo
-            </a>
-          </nav>
-        )}
-
-        {/* Dynamic Action Buttons / User Avatar */}
+        {/* KHU VỰC BÊN PHẢI */}
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
-            /* ICON USER ĐÃ ĐĂNG NHẬP */
-            <button
-              onClick={() => navigate("/tai-khoan")}
-              title="Quản lý tài khoản cá nhân"
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 border border-slate-200 transition-all cursor-pointer shadow-sm"
-            >
-              <FiUser className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate("/tai-khoan")}
+                title="Quản lý tài khoản cá nhân"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 border border-slate-200 transition-all cursor-pointer shadow-sm"
+              >
+                <FiUser className="w-5 h-5" />
+              </button>
+
+              <button
+                onClick={logout}
+                title="Đăng xuất"
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-all cursor-pointer"
+              >
+                <FiLogOut className="w-4 h-4" />
+              </button>
+            </div>
           ) : (
-            /* NÚT ĐĂNG NHẬP & ĐĂNG KÝ KHI CHƯA ĐĂNG NHẬP */
             <>
               <button
                 onClick={() => navigate("/dang-nhap")}

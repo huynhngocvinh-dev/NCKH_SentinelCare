@@ -1,4 +1,3 @@
-import React from "react";
 import { FiCheckCircle, FiVolume2 } from "react-icons/fi";
 import { toast } from "react-toastify";
 
