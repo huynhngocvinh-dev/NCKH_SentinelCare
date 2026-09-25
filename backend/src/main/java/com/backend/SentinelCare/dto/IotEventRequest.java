@@ -15,4 +15,12 @@ public class IotEventRequest {
 
     private Double latitude;
     private Double longitude;
+    
+    private Double accelX;
+    private Double accelY;
+    private Double accelZ;
+
+    private Double gyroX;
+    private Double gyroY;
+    private Double gyroZ;
 }

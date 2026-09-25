@@ -1,23 +1,50 @@
 package com.backend.SentinelCare.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class CameraWebhookRequest {
-    @NotBlank(message = "camera_code là bắt buộc")
-    @JsonProperty("camera_code")
+
+    private String eventId;
+    private String eventType;
+    private String severity;
+    private String timestamp;
+
+   
+    @JsonProperty("cameraId")
     private String cameraCode;
 
-    @JsonProperty("location_name")
     private String locationName;
 
-    private Long timestamp;
+    private PersonData person;
 
-    @JsonProperty("confidence_score")
-    private Float confidenceScore;
+    private String snapshotBase64;
 
-    @JsonProperty("snapshot_url")
-    private String snapshotUrl;
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PersonData {
+        private Integer trackId;
+        private String state;
+        private Double bodyAngle;
+        private Double aspectRatio;
+        private BoundingBox boundingBox;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class BoundingBox {
+        private Integer x1;
+        private Integer y1;
+        private Integer x2;
+        private Integer y2;
+    }
 }

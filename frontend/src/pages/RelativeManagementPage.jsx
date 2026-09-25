@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import { toast } from "react-toastify";
 
+import api from "../services/api";
 import RelativeHeader from "../components/relative/RelativeHeader";
-import PatientInfoCard from "../components/relative/PatientInfoCard";
+// import PatientInfoCard from "../components/relative/PatientInfoCard";
 import EscalationMechanism from "../components/relative/EscalationMechanism";
 import RelativeList from "../components/relative/RelativeList";
 import LookupAndAddForm from "../components/relative/LookupAndAddForm";
 import GeneralSettings from "../components/relative/GeneralSettings";
-
-const API_BASE = "http://localhost:8080/api/emergency-contacts";
 
 export default function RelativeManagementPage() {
   const [relatives, setRelatives] = useState([]);
@@ -17,35 +16,14 @@ export default function RelativeManagementPage() {
   const fetchRelatives = async () => {
     setLoading(true);
     try {
-      const fgUser = JSON.parse(localStorage.getItem("fg_user") || "{}");
-      const token = fgUser.token;
-
-      if (!token) {
-        toast.warn("Vui lòng đăng nhập để xem danh sách người thân!");
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch(API_BASE, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setRelatives(data);
-      } else if (res.status === 403) {
-        toast.error(
-          "Phiên đăng nhập hết hạn hoặc bị từ chối! Vui lòng đăng nhập lại."
-        );
-      } else {
-        toast.error("Không thể tải danh sách người thân từ hệ thống.");
-      }
+      //Gọi API thông qua instance 'api', Interceptor sẽ tự động chèn Token
+      const res = await api.get("/emergency-contacts");
+      setRelatives(res.data);
     } catch (err) {
-      toast.error("Lỗi kết nối tới máy chủ Backend!");
+      // Interceptor đã chuẩn hóa thông điệp lỗi trong err.message
+      toast.error(
+        err.message || "Không thể tải danh sách người thân từ hệ thống."
+      );
     } finally {
       setLoading(false);
     }
@@ -74,7 +52,7 @@ export default function RelativeManagementPage() {
         <RelativeHeader />
 
         {/* Thẻ Sinh hiệu Người Giám Sát */}
-        <PatientInfoCard />
+        {/* <PatientInfoCard /> */}
 
         {/* Cơ chế leo thang */}
         <EscalationMechanism />

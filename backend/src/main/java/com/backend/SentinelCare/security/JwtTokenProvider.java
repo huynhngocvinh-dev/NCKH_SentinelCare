@@ -28,7 +28,7 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .setSubject(phoneNumber)
-                .claim("role", role)
+                .claim("role", role) 
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -43,6 +43,16 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token)
                 .getBody();
         return claims.getSubject();
+    }
+
+    // : Lấy Role từ Token
+    public String getRoleFromJWT(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.get("role", String.class);
     }
 
     // Kiểm tra Token có hợp lệ/hết hạn hay không

@@ -10,7 +10,17 @@ const api = axios.create({
 
 // Attach access token to every request if present
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("fg_access_token");
+  // Ưu tiên lấy từ fg_access_token, dự phòng lấy từ fg_user
+  let token = localStorage.getItem("fg_access_token");
+  if (!token) {
+    try {
+      const fgUser = JSON.parse(localStorage.getItem("fg_user") || "{}");
+      token = fgUser.token || fgUser.accessToken;
+    } catch (e) {
+      token = null;
+    }
+  }
+
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -33,6 +43,14 @@ export const authApi = {
   resendOtp: (payload) => api.post("/auth/resend-otp", payload),
   login: (payload) => api.post("/auth/login", payload),
   me: () => api.get("/auth/me"),
+};
+
+// API Quản lý Sự cố Khẩn cấp
+export const incidentApi = {
+  // Xác nhận sự cố (Ngắt đếm ngược 60s gọi GSM)
+  acknowledge: (id) => api.post(`/incidents/${id}/acknowledge`),
+  // Lấy lịch sử sự cố
+  getHistory: () => api.get("/incidents/history"),
 };
 
 export default api;

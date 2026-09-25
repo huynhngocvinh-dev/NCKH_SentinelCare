@@ -23,9 +23,7 @@ public class DeviceService {
     private final AddressRepository addressRepository;
     private final CameraDeviceRepository cameraDeviceRepository;
 
-    // =========================================================================
     // 1. LUỒNG LẤY DANH SÁCH THIẾT BỊ (Phục vụ API GET /api/devices)
-    // =========================================================================
     @Transactional(readOnly = true)
     public Map<String, Object> getUserDevices(String currentUserEmail) {
         Account account = accountRepository.findByEmail(currentUserEmail)
@@ -47,9 +45,7 @@ public class DeviceService {
         );
     }
 
-    // =========================================================================
     // 2. LUỒNG LƯU THIẾT BỊ ĐEO (Lưu monitored_subjects -> Lưu iot_devices)
-    // =========================================================================
     @Transactional
     public void registerWearableDevice(WearableDeviceRequest request, String currentUserEmail) {
         Account managerAccount = accountRepository.findByEmail(currentUserEmail)
@@ -98,9 +94,8 @@ public class DeviceService {
         iotDeviceRepository.save(device);
     }
 
-    // =========================================================================
+
     // 3. LUỒNG LƯU CAMERA AI (Lưu addresses -> Lưu camera_devices)
-    // =========================================================================
     @Transactional
     public void registerCameraDevice(CameraDeviceRequest request, String currentUserEmail) {
         Account currentUserAccount = accountRepository.findByEmail(currentUserEmail)

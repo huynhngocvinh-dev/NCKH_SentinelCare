@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { FiCheckCircle, FiUserPlus } from "react-icons/fi";
 import { toast } from "react-toastify";
-
-const API_BASE = "http://localhost:8080/api/emergency-contacts";
+import api from "../../../services/api";
 
 export default function ScenarioAForm({
   phoneNumber,
@@ -16,41 +15,31 @@ export default function ScenarioAForm({
     e.preventDefault();
     setSubmitting(true);
 
+    // Payload chuẩn hóa
     const payload = {
-      fullName: userData?.contactName || "Người thân SentinelCare",
+      fullName:
+        userData?.contactName || userData?.name || "Người thân SentinelCare",
       email: userData?.email || "user@sentinelcare.com",
-      activationPhone: phoneNumber,
+      activationPhone: phoneNumber.replace(/\s+/g, ""),
       relationship: "Người nhận chính",
       priorityOrder: parseInt(escalationLevel, 10),
     };
 
     try {
-      const res = await fetch(API_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await api.post("/emergency-contacts", payload);
 
-      if (res.ok) {
-        const savedContact = await res.json();
-        toast.success("Đã lưu Người nhận cảnh báo vào CSDL MySQL!");
-        onSubmitSuccess({
-          id: savedContact.id,
-          name: savedContact.contactName,
-          role: savedContact.relationship,
-          roleBadgeStyle: "bg-blue-100 text-blue-700",
-          statusText: "Đã nhận",
-          phone: savedContact.phoneNumber,
-          email: savedContact.email,
-          channelDesc: `Kích hoạt sau ${
-            escalationLevel === "2" ? "25s" : "50s"
-          } nếu cấp trên chưa phản hồi`,
-        });
-      } else {
-        throw new Error();
+      toast.success("Đã lưu Người nhận cảnh báo vào CSDL MySQL!");
+
+      // Gọi callback để trang cha RelativeManagementPage tự động reload lại danh sách
+      if (onSubmitSuccess) {
+        onSubmitSuccess(res.data);
       }
     } catch (err) {
-      toast.error("Lỗi khi lưu dữ liệu vào Backend!");
+      toast.error(
+        err.response?.data?.message ||
+          err.message ||
+          "Lỗi khi lưu dữ liệu vào Backend!"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -68,14 +57,18 @@ export default function ScenarioAForm({
       <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-bold text-sm flex items-center justify-center">
-            {userData?.contactName
-              ? userData.contactName.charAt(0).toUpperCase()
+            {userData?.contactName || userData?.name
+              ? (userData?.contactName || userData?.name)
+                  .charAt(0)
+                  .toUpperCase()
               : "SC"}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h4 className="font-bold text-sm text-slate-900">
-                {userData?.contactName || "Tài khoản SentinelCare"}
+                {userData?.contactName ||
+                  userData?.name ||
+                  "Tài khoản SentinelCare"}
               </h4>
               <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded">
                 Đã xác thực

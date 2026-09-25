@@ -5,6 +5,7 @@ import com.backend.SentinelCare.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -36,5 +37,18 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getCurrentUser(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(403).body("Phiên đăng nhập không hợp lệ!");
+        }
+        
+        // authentication.getName() sẽ trả về phoneNumber (Subject đã lưu trong JWT)
+        String phoneNumber = authentication.getName();
+        
+        // Gọi hàm lấy thông tin user từ AuthService (hoặc trả về DTO tương ứng)
+        return ResponseEntity.ok(authService.getUserProfileByPhone(phoneNumber));
     }
 }

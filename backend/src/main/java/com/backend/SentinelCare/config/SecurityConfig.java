@@ -41,8 +41,21 @@ public class SecurityConfig {
             
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/auth/**", "/api/incidents/**","/ws-sentinel/**").permitAll()
+                
+                // 1. CÁC ENDPOINT AUTH CÔNG KHAI (KHÔNG CẦN TOKEN)
+                .requestMatchers(
+                    "/api/auth/login", 
+                    "/api/auth/register", 
+                    "/api/auth/verify-otp", 
+                    "/api/auth/resend-otp",
+                    "/api/incidents/**",
+                    "/ws-sentinel/**"
+                ).permitAll()
+                
+                // 2. CÁC ENDPOINT YÊU CẦU XÁC THỰC (CẦN JWT TOKEN HỢP LỆ)
+                .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/devices/**", "/api/emergency-contacts/**").authenticated()
+                
                 .anyRequest().authenticated()
             )
 

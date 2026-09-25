@@ -163,4 +163,27 @@ public class AuthService {
     
         return new AuthResponse(token, fullName, account.getRole().name());
     }
+
+    // 5. LẤY THÔNG TIN TÀI KHOẢN THEO SỐ ĐIỆN THOẠI / EMAIL
+    public UserProfileResponse getUserProfileByPhone(String identifier) {
+        // Tìm tài khoản theo Email hoặc Số điện thoại (do Subject trong Token có thể lưu phone hoặc email)
+        Account account = accountRepository.findByPhoneNumber(identifier)
+                .orElseGet(() -> accountRepository.findByEmail(identifier)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin tài khoản!")));
+
+        // Lấy tên hiển thị từ UserProfile
+        String fullName = userProfileRepository.findByAccountId(account.getId())
+                .map(UserProfile::getFullName)
+                .orElse("Người dùng SentinelCare");
+
+        // Trả về thông tin profile đã tổng hợp
+        return UserProfileResponse.builder()
+                .id(account.getId())
+                .email(account.getEmail())
+                .phoneNumber(account.getPhoneNumber())
+                .fullName(fullName)
+                .role(account.getRole().name())
+                .status(account.getStatus().name())
+                .build();
+    }
 }

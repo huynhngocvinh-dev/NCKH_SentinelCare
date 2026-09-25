@@ -19,7 +19,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class VoipCallService {
 
-    private final TtsService ttsService;
     private final OkHttpClient httpClient = new OkHttpClient();
 
     @Value("${stringee.key.sid:}")
@@ -32,55 +31,47 @@ public class VoipCallService {
     private String stringeeFromNumber;
 
     @Async
-    public void triggerEscalationCallWorkflow(List<EmergencyContact> contacts, String patientName, String location, String timeStr) {
+    public void triggerEscalationCallWorkflow(List<EmergencyContact> contacts, String alertText) {
         if (contacts == null || contacts.isEmpty()) {
             log.warn("⚠️ Không có danh sách người liên hệ khẩn cấp nào được đăng ký.");
             return;
         }
 
-        // 1. Soạn nội dung cảnh báo động bằng Tiếng Việt chuẩn
-        String alertText = String.format(
-                "Cảnh báo khẩn cấp từ Sentinel Care! Người thân %s vừa bị phát hiện té ngã tại %s vào lúc %s. Vui lòng kiểm tra ngay!",
-                patientName, location, timeStr
-        );
+        log.info("🎙️ Nội dung thông báo cuộc gọi GSM: {}", alertText);
 
-        log.info("🎙️ Nội dung thông báo cuộc gọi: {}", alertText);
-
-        // 2. Lặp qua danh sách người thân theo thứ tự ưu tiên
+        // Lặp qua danh sách người thân theo thứ tự ưu tiên
         for (EmergencyContact contact : contacts) {
             String phoneNumber = contact.getPhoneNumber();
             if (phoneNumber == null || phoneNumber.isBlank()) continue;
 
-            log.info("📞 [CUỘC GỌI] Đang thực hiện cuộc gọi tới người thân: {} ({})",
+            log.info("📞 [CUỘC GỌI GSM] Đang thực hiện cuộc gọi tới: {} ({})",
                     contact.getContactName(), phoneNumber);
 
-            // Thực hiện cuộc gọi thật qua Stringee API
             boolean callSuccess = makeRealGsmCall(phoneNumber, alertText);
 
             if (callSuccess) {
                 log.info("Cuộc gọi tới người thân {} ({}) đã khởi tạo thành công!", contact.getContactName(), phoneNumber);
-                break; // Đã kết nối được cuộc gọi khẩn cấp
+                break; // Ngắt vòng lặp khi cuộc gọi đã phát thành công
             } else {
                 log.warn("❌ Không thể kết nối cuộc gọi tới người thân {}. Chuyển sang số tiếp theo...", contact.getContactName());
             }
         }
     }
 
-    /**
-     * Gọi API Stringee để quay số cuộc gọi GSM thật và đọc văn bản bằng giọng nói AI (TTS)
-     */
     private boolean makeRealGsmCall(String toPhoneNumber, String textToRead) {
         try {
-            // Chuyển định dạng số điện thoại Việt Nam (ví dụ: 0912345678 -> 84912345678)
+            if (stringeeFromNumber == null || stringeeFromNumber.isBlank()) {
+                log.warn("⚠️ [VOIP SIMULATE] Chưa cấu hình stringee.from.number. Giả lập phát cuộc gọi thành công!");
+                return true; 
+            }
+
             String formattedPhone = toPhoneNumber.trim();
             if (formattedPhone.startsWith("0")) {
                 formattedPhone = "84" + formattedPhone.substring(1);
             }
 
-            // Tạo Stringee JWT Token
             String jwtToken = generateStringeeJwtToken();
 
-            // Cấu hình Call Logic (NCCO) của Stringee để phát giọng nói Text-to-Speech
             String jsonPayload = String.format("""
                 {
                   "from": {
@@ -122,18 +113,15 @@ public class VoipCallService {
                 if (response.isSuccessful() && response.body() != null) {
                     String responseStr = response.body().string();
                     log.info("📡 Phản hồi từ Stringee Gateway: {}", responseStr);
-                    return responseStr.contains("\"r\":0"); // "r":0 tương ứng với thành công trong Stringee API
+                    return responseStr.contains("\"r\":0");
                 }
             }
         } catch (Exception e) {
-            log.error("Lỗi khi thực hiện cuộc gọi GSM thật qua Stringee: ", e);
+            log.error("Lỗi khi thực hiện cuộc gọi GSM qua Stringee: ", e);
         }
         return false;
     }
 
-    /**
-     * Tạo JWT Token xác thực cho Stringee API
-     */
     private String generateStringeeJwtToken() {
         Algorithm algorithm = Algorithm.HMAC256(stringeeKeySecret);
         Instant now = Instant.now();

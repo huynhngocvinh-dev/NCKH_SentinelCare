@@ -3,7 +3,7 @@ package com.backend.SentinelCare.controller;
 import com.backend.SentinelCare.dto.EmergencyContactRequest;
 import com.backend.SentinelCare.model.EmergencyContact;
 import com.backend.SentinelCare.repository.EmergencyContactRepository;
-import com.backend.SentinelCare.service.EmergencyContactService; // 🟢 Đã đổi import
+import com.backend.SentinelCare.service.EmergencyContactService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,13 +13,18 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/emergency-contacts")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class EmergencyContactController {
 
-    // 🟢 Tiêm EmergencyContactService thay cho DeviceService
     private final EmergencyContactService contactService;
     private final EmergencyContactRepository contactRepository;
+
+    @GetMapping
+    public ResponseEntity<List<EmergencyContact>> getAllContacts() {
+        // Hoặc gọi từ contactService.getAllContacts() tùy theo logic của bạn
+        List<EmergencyContact> contacts = contactRepository.findAll();
+        return ResponseEntity.ok(contacts);
+    }
 
     @GetMapping("/check-phone")
     public ResponseEntity<?> checkPhoneExistence(@RequestParam String phone) {
@@ -32,7 +37,6 @@ public class EmergencyContactController {
 
     @PostMapping
     public ResponseEntity<EmergencyContact> addContact(@Valid @RequestBody EmergencyContactRequest request) {
-        // 🟢 Gọi hàm từ contactService
         EmergencyContact contact = contactService.addEmergencyContact(request);
         return ResponseEntity.ok(contact);
     }

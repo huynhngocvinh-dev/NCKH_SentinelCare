@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { FiAlertTriangle, FiSave } from "react-icons/fi";
 import { toast } from "react-toastify";
+import api from "../../../services/api";
 
 const isValidVietnamesePhone = (phoneStr) => {
   if (!phoneStr) return true;
   const cleanPhone = phoneStr.replace(/\s+/g, "");
-  return /(^(0[3|5|7|8|9])+([0-9]{8})$)|(^\+84[3|5|7|8|9]+([0-9]{8})$)/.test(
-    cleanPhone
-  );
+
+  return /^(0[35789]\d{8}|\+84[35789]\d{8})$/.test(cleanPhone);
 };
 
 const isValidEmail = (emailStr) => {
@@ -23,6 +23,7 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
     relationship: "",
   });
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (initialPhone) {
@@ -30,7 +31,7 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
     }
   }, [initialPhone]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
 
@@ -53,18 +54,36 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
       return;
     }
 
-    const newRelative = {
-      id: Date.now(),
-      name: formData.fullName,
-      role: formData.relationship || "Hàng xóm sao lưu",
-      roleBadgeStyle: "bg-slate-200 text-slate-700",
-      statusText: "Chưa nhận (SMS & Gọi)",
-      phone: formData.activationPhone || initialPhone,
-      email: formData.email || "chua_co_email@domain.com",
-      channelDesc: "Cuộc gọi tự động AI & SMS báo động sau 90s",
+    setSubmitting(true);
+
+    const payload = {
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim() || "chua_co_email@domain.com",
+      activationPhone: (formData.activationPhone || initialPhone).replace(
+        /\s+/g,
+        ""
+      ),
+      relationship: formData.relationship.trim() || "Hàng xóm sao lưu",
+      priorityOrder: 2,
     };
 
-    onSubmitSuccess(newRelative);
+    try {
+      const res = await api.post("/emergency-contacts", payload);
+
+      toast.success("Đã thêm liên hệ cứu hộ dự phòng vào CSDL!");
+
+      if (onSubmitSuccess) {
+        onSubmitSuccess(res.data);
+      }
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message ||
+          err.message ||
+          "Không thể lưu liên hệ cứu hộ!"
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -180,10 +199,13 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
 
       <button
         type="submit"
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+        disabled={submitting}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50"
       >
         <FiSave className="w-4 h-4" />
-        <span>Lưu & Thêm Người nhận cảnh báo</span>
+        <span>
+          {submitting ? "Đang lưu..." : "Lưu & Thêm Người nhận cảnh báo"}
+        </span>
       </button>
     </form>
   );

@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "address"})
 public class FallIncident {
 
     @Id
@@ -43,14 +46,15 @@ public class FallIncident {
     private String snapshotUrl;
 
     @Enumerated(EnumType.STRING)
-    @Column(columnDefinition = "ENUM('PENDING', 'CANCELLED_BY_USER', 'SOS_BY_USER', 'CONFIRMED_FALL', 'FALSE_POSITIVE') DEFAULT 'PENDING'")
-    private IncidentStatus status;
+    @Column(name = "status", length = 50)
+    private IncidentStatus status;  
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    // Trạng thái ACKNOWLEDGED (Người thân bấm xác nhận đã đọc)
     public enum IncidentStatus {
-        PENDING, CANCELLED_BY_USER, SOS_BY_USER, CONFIRMED_FALL, FALSE_POSITIVE
+        PENDING, CANCELLED_BY_USER, SOS_BY_USER, CONFIRMED_FALL, ACKNOWLEDGED, FALSE_POSITIVE
     }
 }

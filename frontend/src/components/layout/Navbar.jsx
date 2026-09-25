@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   FiShield,
   FiActivity,
@@ -9,9 +10,12 @@ import {
   FiClock,
   FiUser,
   FiLogOut,
+  FiBell,
+  FiAlertTriangle,
 } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useIncidentWebSocket } from "../../hooks/useIncidentWebSocket";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -20,6 +24,19 @@ export default function Navbar() {
 
   const isLoggedIn = isAuthenticated || Boolean(user);
   const isActive = (path) => location.pathname === path;
+
+  // State quản lý danh sách thông báo & Menu Dropdown ở chuông
+  const [notifications, setNotifications] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Lắng nghe WebSocket: Lưu vào danh sách thông báo của Chuông khi có sự cố
+  useIncidentWebSocket((newIncident) => {
+    if (isLoggedIn) {
+      setNotifications((prev) => [newIncident, ...prev]);
+      setUnreadCount((prev) => prev + 1);
+    }
+  });
 
   return (
     <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-sm">
@@ -52,9 +69,8 @@ export default function Navbar() {
 
       {/* Main Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        {/* KHU VỰC BÊN TRÁI: LOGO + MENU ĐI KÈM KẾ BÊN */}
+        {/* LOGO & MENU PHÍA TRÁI */}
         <div className="flex items-center gap-8">
-          {/* Logo Brand */}
           <div
             className="flex items-center gap-3 cursor-pointer shrink-0"
             onClick={() => navigate("/")}
@@ -77,7 +93,7 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Menu khi đã đăng nhập (Đứng ngay cạnh Logo) */}
+          {/* Menu chính khi đã đăng nhập */}
           {isLoggedIn && (
             <nav className="flex items-center gap-1 sm:gap-2">
               <button
@@ -170,7 +186,85 @@ export default function Navbar() {
         {/* KHU VỰC BÊN PHẢI */}
         <div className="flex items-center gap-3">
           {isLoggedIn ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative">
+              {/* CHUỒNG THÔNG BÁO CHUNG */}
+              <button
+                onClick={() => {
+                  setShowDropdown(!showDropdown);
+                  setUnreadCount(0);
+                }}
+                title="Thông báo hệ thống"
+                className="relative flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-600 border border-slate-200 transition-all cursor-pointer shadow-sm"
+              >
+                <FiBell className="w-5 h-5" />
+
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white ring-2 ring-white animate-bounce">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* MENU DROPDOWN CHUỒNG THÔNG BÁO */}
+              {showDropdown && (
+                <div className="absolute right-0 top-12 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 py-3 z-50 animate-fade-in">
+                  <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
+                      <FiAlertTriangle className="text-red-500" />
+                      Thông báo sự cố & Hệ thống
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setShowDropdown(false);
+                        navigate("/lich-su");
+                      }}
+                      className="text-xs text-blue-600 font-semibold hover:underline"
+                    >
+                      Xem tất cả
+                    </button>
+                  </div>
+
+                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-slate-400 text-xs">
+                        Chưa có thông báo sự cố mới nào.
+                      </div>
+                    ) : (
+                      notifications.map((item, index) => (
+                        <div
+                          key={index}
+                          className="p-3.5 hover:bg-slate-50 transition-colors flex items-start gap-3 text-left cursor-pointer"
+                          onClick={() => {
+                            setShowDropdown(false);
+                            navigate("/lich-su");
+                          }}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+                            🚨
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-slate-800 truncate">
+                              {item.patientName || "Sự cố Té ngã"}
+                            </p>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {item.location || item.source}
+                            </p>
+                            <span className="text-[10px] text-slate-400">
+                              {item.incidentTime
+                                ? new Date(
+                                    item.incidentTime
+                                  ).toLocaleTimeString("vi-VN")
+                                : "Vừa xong"}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Nút Quản lý tài khoản */}
               <button
                 onClick={() => navigate("/tai-khoan")}
                 title="Quản lý tài khoản cá nhân"
@@ -179,6 +273,7 @@ export default function Navbar() {
                 <FiUser className="w-5 h-5" />
               </button>
 
+              {/* Nút Đăng xuất */}
               <button
                 onClick={logout}
                 title="Đăng xuất"

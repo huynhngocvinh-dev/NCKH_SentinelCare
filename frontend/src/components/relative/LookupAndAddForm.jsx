@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
+import api from "../../services/api";
 import ScenarioAForm from "./lookup/ScenarioAForm";
 import ScenarioBForm from "./lookup/ScenarioBForm";
 import Step1PhoneLookup from "./lookup/Step1PhoneLookup";
 
-const API_BASE = "http://localhost:8080/api/emergency-contacts";
-
 const isValidVietnamesePhone = (phoneStr) => {
   const cleanPhone = phoneStr.replace(/\s+/g, "");
-  return /(^(0[3|5|7|8|9])+([0-9]{8})$)\vert{}(^\+84[3\vert{}5\vert{}7\vert{}8\vert{}9]+([0-9]{8})$)/.test(
+  return /(^(0[3|5|7|8|9])([0-9]{8})$)|(^\+84[3|5|7|8|9]([0-9]{8})$)/.test(
     cleanPhone
   );
 };
@@ -39,34 +38,27 @@ export default function LookupAndAddForm({ onAddSuccess }) {
 
     try {
       const cleanPhone = phoneNumber.replace(/\s+/g, "");
-      const token = localStorage.getItem("token");
 
-      const res = await fetch(
-        `${API_BASE}/check-phone?phone=${encodeURIComponent(cleanPhone)}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+      const res = await api.get(
+        `/emergency-contacts/check-phone?phone=${encodeURIComponent(
+          cleanPhone
+        )}`
       );
 
       setHasSearched(true);
-
-      if (res.ok) {
-        const data = await res.json();
-        setFoundUserData(data);
-        setActiveScenario("A");
-        toast.success(`Đã tìm thấy tài khoản liên kết với số ${cleanPhone}!`);
-      } else if (res.status === 404) {
+      setFoundUserData(res.data);
+      setActiveScenario("A");
+      toast.success(`Đã tìm thấy tài khoản liên kết với số ${cleanPhone}!`);
+    } catch (err) {
+      setHasSearched(true);
+      // Nếu Backend trả về 404 (Không tìm thấy số điện thoại)
+      if (err.response?.status === 404) {
         setFoundUserData(null);
         setActiveScenario("B");
         toast.warn("Số điện thoại này chưa đăng ký tài khoản!");
       } else {
-        throw new Error("Lỗi hệ thống khi tra cứu!");
+        toast.error(err.message || "Không thể kết nối tới máy chủ Backend!");
       }
-    } catch (err) {
-      toast.error("Không thể kết nối tới máy chủ Backend (Spring Boot)!");
     } finally {
       setSearching(false);
     }
