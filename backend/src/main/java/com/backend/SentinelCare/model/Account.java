@@ -1,4 +1,3 @@
-
 package com.backend.SentinelCare.model;
 import jakarta.persistence.*;
 import lombok.*;

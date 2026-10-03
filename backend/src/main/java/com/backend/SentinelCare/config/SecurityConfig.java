@@ -42,7 +42,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
-                // 1. CÁC ENDPOINT AUTH CÔNG KHAI (KHÔNG CẦN TOKEN)
+                // 1. CÁC ENDPOINT AUTH & PUBLIC (KHÔNG CẦN TOKEN)
                 .requestMatchers(
                     "/api/auth/login", 
                     "/api/auth/register", 
@@ -51,8 +51,14 @@ public class SecurityConfig {
                     "/api/incidents/**",
                     "/ws-sentinel/**"
                 ).permitAll()
+
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions/packages").permitAll()
                 
-                // 2. CÁC ENDPOINT YÊU CẦU XÁC THỰC (CẦN JWT TOKEN HỢP LỆ)
+                .requestMatchers("/api/admin/packages/**").hasRole("ADMIN")
+                
+                .requestMatchers("/api/subscriptions/purchase", "/api/subscriptions/cancel", "/api/subscriptions/my-subscription").authenticated()
+
+                //  CÁC ENDPOINT KHÁC YÊU CẦU XÁC THỰC
                 .requestMatchers("/api/auth/me").authenticated()
                 .requestMatchers("/api/devices/**", "/api/emergency-contacts/**").authenticated()
                 
