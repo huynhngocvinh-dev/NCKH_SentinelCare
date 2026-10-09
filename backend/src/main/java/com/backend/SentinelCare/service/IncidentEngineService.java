@@ -23,18 +23,15 @@ public class IncidentEngineService {
     private final SensorDataRepository sensorDataRepository;
     private final CameraDeviceRepository cameraDeviceRepository;
     private final CameraHistoryRepository cameraHistoryRepository;
-    
-    
+
     private final IncidentFusionService fusionService;
     private final IncidentNotificationService notificationService;
 
-    // 1. TIẾP NHẬN CAMERA WEBHOOK
+    // 1. TIẾP NHẬN CAMERA WEBHOOK: Bỏ qua đếm ngược 25s, cảnh báo ngay
     @Transactional
     public FallIncident processCameraWebhook(CameraWebhookRequest request) {
-        // A. Lưu log thô vào camera_history
         saveCameraRawHistory(request);
 
-        // B. Tìm/Tạo mới Camera Device
         String camCode = request.getCameraCode() != null ? request.getCameraCode() : "CAM_DEFAULT";
         String location = request.getLocationName() != null ? request.getLocationName() : "Phòng khách (Camera AI)";
 
@@ -45,77 +42,62 @@ public class IncidentEngineService {
                         .status(CameraDevice.Status.active)
                         .build()));
 
-        // C. Dung hợp sự cố và lưu DB
+        // Dung hợp sự cố và đặt trạng thái CONFIRMED_FALL & CALL_NOT_STARTED
         FallIncident incident = fusionService.fuseCameraEvent(camera, request);
+        incident.setStatus(FallIncident.IncidentStatus.CONFIRMED_FALL);
+        incident.setCallEscalationStatus(FallIncident.CallEscalationStatus.CALL_NOT_STARTED);
         incident = incidentRepository.save(incident);
 
-        // D. Kích hoạt đếm ngược 25s
-        trigger25sVerificationWindow(incident.getId());
+        log.warn("🚨 [CAMERA AI] Phát hiện té ngã! Bắt đầu phát cảnh báo ngay lập tức.");
+        triggerEscalationWorkflow(incident);
+        
         return incident;
     }
 
-    // 2. TIẾP NHẬN IOT EVENT
+    // 2. TIẾP NHẬN IOT EVENT: Đếm ngược 25s & Cảnh báo về thiết bị đeo
     @Transactional
     public FallIncident processIotEvent(IotEventRequest request) {
         Optional<IotDevice> deviceOpt = iotDeviceRepository.findByDeviceSerial(request.getDeviceSerial());
         if (deviceOpt.isEmpty()) {
-            log.warn("Thiết bị IoT chưa đăng ký: {}", request.getDeviceSerial());
+            log.warn("⚠️ Thiết bị IoT chưa đăng ký: {}", request.getDeviceSerial());
             return null;
         }
 
         IotDevice device = deviceOpt.get();
-        
-        //Lưu nhật ký cảm biến thô vào bảng sensor_data
         saveRawSensorData(request, device);
-
         MonitoredSubject patient = device.getMonitoredSubject();
 
-        if ("CANCEL".equalsIgnoreCase(request.getEventType())) {
+        // TH1: Bấm 3 lần để HỦY (Báo nhầm)
+        if ("CANCEL".equalsIgnoreCase(request.getEventType()) || "CANCEL_3X".equalsIgnoreCase(request.getEventType())) {
             cancelActiveIncident(patient != null ? patient.getId() : null);
             return null;
         }
 
-        if ("SOS_NOW".equalsIgnoreCase(request.getEventType())) {
+        // TH2: Bấm 1 lần xác nhận ngã / Bấm SOS
+        if ("SOS_NOW".equalsIgnoreCase(request.getEventType()) || "CONFIRM_NOW".equalsIgnoreCase(request.getEventType())) {
+            log.info("🆘 Bệnh nhân bấm xác nhận ngã/SOS trên thiết bị!");
             return triggerImmediateSos(device, patient, request.getLatitude(), request.getLongitude());
         }
 
-        // Dung hợp sự cố và lưu DB
+        // TH3: Cảm biến tự động phát hiện nghi ngờ té ngã -> PENDING & Đếm ngược 25s
         FallIncident incident = fusionService.fuseIotEvent(device, patient, request);
+        incident.setStatus(FallIncident.IncidentStatus.PENDING);
+        incident.setCallEscalationStatus(FallIncident.CallEscalationStatus.CALL_NOT_STARTED);
         incident = incidentRepository.save(incident);
 
-        trigger25sVerificationWindow(incident.getId());
+        // Báo động xuống thiết bị đeo IoT (Rung/Còi)
+        sendAlertSignalToIotDevice(device.getDeviceSerial());
+
+        // Kích hoạt đếm ngược 25s
+        trigger25sIotVerificationWindow(incident.getId());
         return incident;
     }
 
-    private void saveRawSensorData(IotEventRequest request, IotDevice device) {
-        try {
-            String rawJson = String.format("{\"lat\": %s, \"lng\": %s, \"eventType\": \"%s\"}",
-                    request.getLatitude(), request.getLongitude(), request.getEventType());
-    
-            SensorData sensorLog = SensorData.builder()
-                    .iotDevice(device)
-                    .accelerationX(request.getAccelX())
-                    .accelerationY(request.getAccelY())
-                    .accelerationZ(request.getAccelZ())
-                    .gyroX(request.getGyroX())
-                    .gyroY(request.getGyroY())
-                    .gyroZ(request.getGyroZ())
-                    .fallDetected("FALL_DETECTED".equalsIgnoreCase(request.getEventType()))
-                    .fallConfidence(0.95f)
-                    .rawData(rawJson)
-                    .build();
-    
-            sensorDataRepository.save(sensorLog);
-            log.info("Đã lưu thành công SensorData cho thiết bị IoT: {}", device.getDeviceSerial());
-        } catch (Exception e) {
-            log.error("Lỗi khi lưu SensorData: ", e);
-        }
-    }
-
-    // 3. CỬA SỔ XÁC MINH BAN ĐẦU (25 GIÂY)
+    // 3. CỬA SỔ XÁC MINH 25 GIÂY CHO IOT
     @Async
-    public void trigger25sVerificationWindow(Long incidentId) {
+    public void trigger25sIotVerificationWindow(Long incidentId) {
         try {
+            log.info("⏳ [IOT DEVICE] Đang đếm ngược 25s chờ phản hồi từ người đeo...");
             Thread.sleep(25000);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -128,32 +110,86 @@ public class IncidentEngineService {
                 incident.setStatus(FallIncident.IncidentStatus.CONFIRMED_FALL);
                 incidentRepository.save(incident);
 
-                log.warn("🚨 [CONFIRMED] XÁC NHẬN NGÃ THẬT! Bắt đầu luồng thông báo 60s.");
-                start60sEscalationWorkflow(incident);
+                log.warn("🚨 [IOT 25S TIMEOUT] Hết 25s không bấm hủy. Bắt đầu phát cảnh báo!");
+                triggerEscalationWorkflow(incident);
             }
         }
     }
 
-    // 4. BẮT ĐẦU LUỒNG THÔNG BÁO TỨC THÌ VÀ ĐẾM NGƯỢC 60S
-    private void start60sEscalationWorkflow(FallIncident incident) {
-        String alertText = fusionService.buildCompositeAlertText(incident);
-        
-        // Bắn WebSocket & Email TTS
-        notificationService.dispatchImmediateNotifications(incident, alertText);
-
-        // Chạy timer đếm ngược 60s
-        notificationService.trigger60sCallEscalationTimer(incident.getId(), alertText);
-    }
-
-    // 5. API XÁC NHẬN TỪ NGƯỜI THÂN
+    // 4. API XÁC NHẬN TỪ NGƯỜI THÂN (Dừng leo thang cuộc gọi)
     @Transactional
     public void acknowledgeIncident(Long incidentId) {
         Optional<FallIncident> incidentOpt = incidentRepository.findById(incidentId);
         if (incidentOpt.isPresent()) {
             FallIncident incident = incidentOpt.get();
             incident.setStatus(FallIncident.IncidentStatus.ACKNOWLEDGED);
+            // Dừng tiến trình gọi
+            incident.setCallEscalationStatus(FallIncident.CallEscalationStatus.ESCALATION_STOPPED);
             incidentRepository.save(incident);
-            log.info("👍 Đã xác nhận sự cố ID: {}. Đã khóa leo thang cuộc gọi!", incidentId);
+            log.info("👍 Đã xác nhận sự cố ID: {}. Đã khóa cuộc gọi leo thang!", incidentId);
+        }
+    }
+
+    private void triggerEscalationWorkflow(FallIncident incident) {
+        String alertText = fusionService.buildCompositeAlertText(incident);
+        notificationService.dispatchImmediateNotifications(incident, alertText);
+    }
+
+    private void cancelActiveIncident(Long patientId) {
+        if (patientId == null) return;
+        Optional<FallIncident> pendingOpt = incidentRepository.findFirstByPatientIdAndStatusOrderByIncidentTimeDesc(
+                patientId, FallIncident.IncidentStatus.PENDING);
+
+        if (pendingOpt.isPresent()) {
+            FallIncident incident = pendingOpt.get();
+            incident.setStatus(FallIncident.IncidentStatus.CANCELLED_BY_USER);
+            incident.setCallEscalationStatus(FallIncident.CallEscalationStatus.ESCALATION_STOPPED);
+            incidentRepository.save(incident);
+            log.info(" [CANCELLED] da huy dem nguoc 25s!");
+        }
+    }
+
+    private void sendAlertSignalToIotDevice(String deviceSerial) {
+        log.info(" [MQTT/HTTP] gui lenh phat coi /rung dem nguocc 25s toi IoT: {}", deviceSerial);
+    }
+
+    private FallIncident triggerImmediateSos(IotDevice device, MonitoredSubject patient, Double lat, Double lng) {
+        FallIncident incident = FallIncident.builder()
+                .iotDevice(device)
+                .patient(patient)
+                .latitude(lat)
+                .longitude(lng)
+                .incidentTime(LocalDateTime.now())
+                .status(FallIncident.IncidentStatus.CONFIRMED_FALL)
+                .callEscalationStatus(FallIncident.CallEscalationStatus.CALL_NOT_STARTED)
+                .build();
+
+        incident = incidentRepository.save(incident);
+        triggerEscalationWorkflow(incident);
+        return incident;
+    }
+
+    private void saveRawSensorData(IotEventRequest request, IotDevice device) {
+        try {
+            String rawJson = String.format("{\"lat\": %s, \"lng\": %s, \"eventType\": \"%s\"}",
+                    request.getLatitude(), request.getLongitude(), request.getEventType());
+
+            SensorData sensorLog = SensorData.builder()
+                    .iotDevice(device)
+                    .accelerationX(request.getAccelX())
+                    .accelerationY(request.getAccelY())
+                    .accelerationZ(request.getAccelZ())
+                    .gyroX(request.getGyroX())
+                    .gyroY(request.getGyroY())
+                    .gyroZ(request.getGyroZ())
+                    .fallDetected("FALL_DETECTED".equalsIgnoreCase(request.getEventType()))
+                    .fallConfidence(0.95f)
+                    .rawData(rawJson)
+                    .build();
+
+            sensorDataRepository.save(sensorLog);
+        } catch (Exception e) {
+            log.error("loi khi luu SensorData: ", e);
         }
     }
 
@@ -180,35 +216,7 @@ public class IncidentEngineService {
 
             cameraHistoryRepository.save(history);
         } catch (Exception e) {
-            log.error("Lỗi khi lưu camera_history: ", e);
+            log.error("loi khi luu camera_history: ", e);
         }
-    }
-
-    private void cancelActiveIncident(Long patientId) {
-        if (patientId == null) return;
-        Optional<FallIncident> pendingOpt = incidentRepository.findFirstByPatientIdAndStatusOrderByIncidentTimeDesc(
-                patientId, FallIncident.IncidentStatus.PENDING);
-
-        if (pendingOpt.isPresent()) {
-            FallIncident incident = pendingOpt.get();
-            incident.setStatus(FallIncident.IncidentStatus.CANCELLED_BY_USER);
-            incidentRepository.save(incident);
-            log.info("Bệnh nhân nhấn hủy 3 lần. Đã hủy đếm ngược!");
-        }
-    }
-
-    private FallIncident triggerImmediateSos(IotDevice device, MonitoredSubject patient, Double lat, Double lng) {
-        FallIncident incident = FallIncident.builder()
-                .iotDevice(device)
-                .patient(patient)
-                .latitude(lat)
-                .longitude(lng)
-                .incidentTime(LocalDateTime.now())
-                .status(FallIncident.IncidentStatus.SOS_BY_USER)
-                .build();
-
-        incident = incidentRepository.save(incident);
-        start60sEscalationWorkflow(incident);
-        return incident;
     }
 }

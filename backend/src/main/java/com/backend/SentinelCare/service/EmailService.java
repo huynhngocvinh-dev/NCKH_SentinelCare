@@ -42,9 +42,9 @@ public class EmailService {
 
             helper.setText(htmlContent, true);
             mailSender.send(message);
-            log.info("[EMAIL SENT] Đã gửi thư chứa OTP thành công tới: {}", toEmail);
+            log.info("[EMAIL SENT] da gui thu thanh cong toi : {}", toEmail);
         } catch (MessagingException e) {
-            log.error("Lỗi khi gửi Email OTP tới {}: ", toEmail, e);
+            log.error("loi khi gui Email OTP toi {}: ", toEmail, e);
         }
     }
 
@@ -96,9 +96,9 @@ public class EmailService {
             }
 
             mailSender.send(message);
-            log.info("[EMAIL ALERT SENT] Đã gửi Email cảnh báo khẩn cấp kèm Audio và Nút xác nhận tới: {}", toEmail);
+            log.info("[EMAIL ALERT SENT] da gui canh bao toi : {}", toEmail);
         } catch (Exception e) {
-            log.error("Lỗi khi gửi Email cảnh báo khẩn cấp tới {}: ", toEmail, e);
+            log.error("loi khi gui canh bao toi  {}: ", toEmail, e);
         }
     }
 }

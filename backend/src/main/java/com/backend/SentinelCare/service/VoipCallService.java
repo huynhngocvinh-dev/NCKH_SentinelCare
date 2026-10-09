@@ -1,6 +1,8 @@
 package com.backend.SentinelCare.service;
 
 import com.backend.SentinelCare.model.EmergencyContact;
+import com.backend.SentinelCare.model.FallIncident;
+import com.backend.SentinelCare.repository.FallIncidentRepository;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import okhttp3.*;
@@ -11,8 +13,10 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -20,6 +24,7 @@ import java.util.List;
 public class VoipCallService {
 
     private final OkHttpClient httpClient = new OkHttpClient();
+    private final FallIncidentRepository incidentRepository;
 
     @Value("${stringee.key.sid:}")
     private String stringeeKeySid;
@@ -30,38 +35,76 @@ public class VoipCallService {
     @Value("${stringee.from.number:}")
     private String stringeeFromNumber;
 
+    /**
+     * Luồng gọi điện leo thang xoay vòng theo độ ưu tiên tích hợp lớp Trạng thái mới
+     */
     @Async
-    public void triggerEscalationCallWorkflow(List<EmergencyContact> contacts, String alertText) {
+    public void triggerEscalationCallWorkflow(Long incidentId, List<EmergencyContact> contacts, String alertText) {
         if (contacts == null || contacts.isEmpty()) {
             log.warn("⚠️ Không có danh sách người liên hệ khẩn cấp nào được đăng ký.");
+            updateCallStatus(incidentId, FallIncident.CallEscalationStatus.ESCALATION_STOPPED);
             return;
         }
 
-        log.info("🎙️ Nội dung thông báo cuộc gọi GSM: {}", alertText);
+        List<EmergencyContact> sortedContacts = contacts.stream()
+                .filter(c -> c.getPhoneNumber() != null && !c.getPhoneNumber().isBlank())
+                .sorted(Comparator.comparing(EmergencyContact::getPriorityOrder, Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
 
-        // Lặp qua danh sách người thân theo thứ tự ưu tiên
-        for (EmergencyContact contact : contacts) {
+        log.info("🎙️ Bắt đầu luồng gọi điện GSM xoay vòng cho Sự cố ID {}", incidentId);
+
+        for (EmergencyContact contact : sortedContacts) {
+            // Kiểm tra trạng thái sự cố trước khi BẮT ĐẦU cuộc gọi mới
+            Optional<FallIncident> currentIncidentOpt = incidentRepository.findById(incidentId);
+            if (currentIncidentOpt.isPresent() && currentIncidentOpt.get().getStatus() == FallIncident.IncidentStatus.ACKNOWLEDGED) {
+                log.info("🛑 Sự cố ID {} đã được ACKNOWLEDGED. Không chuyển sang gọi người ưu tiên tiếp theo nữa.", incidentId);
+                updateCallStatus(incidentId, FallIncident.CallEscalationStatus.ESCALATION_STOPPED);
+                break;
+            }
+
             String phoneNumber = contact.getPhoneNumber();
-            if (phoneNumber == null || phoneNumber.isBlank()) continue;
+            log.info("📞 [CALLING] [Priority {}] Đang gọi tới: {} ({})",
+                    contact.getPriorityOrder(), contact.getContactName(), phoneNumber);
 
-            log.info("📞 [CUỘC GỌI GSM] Đang thực hiện cuộc gọi tới: {} ({})",
-                    contact.getContactName(), phoneNumber);
+            // Cập nhật trạng thái cuộc gọi sang CALLING
+            updateCallStatus(incidentId, FallIncident.CallEscalationStatus.CALLING);
 
+            // Thực hiện cuộc gọi
             boolean callSuccess = makeRealGsmCall(phoneNumber, alertText);
 
             if (callSuccess) {
-                log.info("Cuộc gọi tới người thân {} ({}) đã khởi tạo thành công!", contact.getContactName(), phoneNumber);
-                break; // Ngắt vòng lặp khi cuộc gọi đã phát thành công
+                // Đã bắt máy / kết nối cuộc gọi thành công
+                updateCallStatus(incidentId, FallIncident.CallEscalationStatus.CALL_CONNECTED);
+                log.info("✅ [CALL_CONNECTED] Cuộc gọi tới người thân {} đã kết nối và phát xong thông báo!", contact.getContactName());
+                
+                // Sau khi cuộc gọi hiện tại hoàn tất thành công, dừng xoay vòng gọi tiếp
+                break; 
             } else {
-                log.warn("❌ Không thể kết nối cuộc gọi tới người thân {}. Chuyển sang số tiếp theo...", contact.getContactName());
+                // Không nghe máy / bận / timeout
+                updateCallStatus(incidentId, FallIncident.CallEscalationStatus.CALL_TIMEOUT);
+                log.warn("⏱️ [CALL_TIMEOUT] Người thân {} không nghe/bận. Chuẩn bị chuyển sang priority tiếp theo...", contact.getContactName());
+                
+                try {
+                    Thread.sleep(3000); // Tạm dừng 3s trước khi gọi số tiếp theo
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
+    }
+
+    private void updateCallStatus(Long incidentId, FallIncident.CallEscalationStatus status) {
+        incidentRepository.findById(incidentId).ifPresent(incident -> {
+            incident.setCallEscalationStatus(status);
+            incidentRepository.save(incident);
+        });
     }
 
     private boolean makeRealGsmCall(String toPhoneNumber, String textToRead) {
         try {
             if (stringeeFromNumber == null || stringeeFromNumber.isBlank()) {
-                log.warn("⚠️ [VOIP SIMULATE] Chưa cấu hình stringee.from.number. Giả lập phát cuộc gọi thành công!");
+                log.warn("⚠️️ [VOIP SIMULATE] Chưa cấu hình stringee.from.number. Giả lập gọi thành công!");
                 return true; 
             }
 
@@ -74,18 +117,8 @@ public class VoipCallService {
 
             String jsonPayload = String.format("""
                 {
-                  "from": {
-                    "type": "external",
-                    "number": "%s",
-                    "alias": "%s"
-                  },
-                  "to": [
-                    {
-                      "type": "external",
-                      "number": "%s",
-                      "alias": "%s"
-                    }
-                  ],
+                  "from": { "type": "external", "number": "%s", "alias": "%s" },
+                  "to": [ { "type": "external", "number": "%s", "alias": "%s" } ],
                   "actions": [
                     {
                       "action": "talk",

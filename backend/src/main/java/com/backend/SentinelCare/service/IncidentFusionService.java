@@ -63,7 +63,7 @@ public class IncidentFusionService {
             incident.setPatient(patient);
             incident.setLatitude(request.getLatitude());
             incident.setLongitude(request.getLongitude());
-            log.info("🔀 [FUSION] Gộp sự cố IoT ({}) vào Sự cố Camera (ID: {}) đang chờ!", device.getDeviceSerial(), incident.getId());
+            log.info(" [FUSION] gop su co IoT ({}) vao su co Camera (ID: {}) dang cho!", device.getDeviceSerial(), incident.getId());
             return incident;
         }
 

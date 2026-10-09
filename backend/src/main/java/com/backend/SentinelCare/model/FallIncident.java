@@ -3,9 +3,7 @@ package com.backend.SentinelCare.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -45,16 +43,29 @@ public class FallIncident {
     @Column(name = "snapshot_url", length = 550)
     private String snapshotUrl;
 
+    // 1. Trạng thái vòng đời sự cố
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 50)
     private IncidentStatus status;  
+
+    // 2. Trạng thái tiến trình cuộc gọi khẩn cấp (Lớp trạng thái bổ sung)
+    @Enumerated(EnumType.STRING)
+    @Column(name = "call_escalation_status", length = 50)
+    private CallEscalationStatus callEscalationStatus;
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // Trạng thái ACKNOWLEDGED (Người thân bấm xác nhận đã đọc)
     public enum IncidentStatus {
         PENDING, CANCELLED_BY_USER, SOS_BY_USER, CONFIRMED_FALL, ACKNOWLEDGED, FALSE_POSITIVE
+    }
+
+    public enum CallEscalationStatus {
+        CALL_NOT_STARTED,
+        CALLING,
+        CALL_CONNECTED,
+        CALL_TIMEOUT,
+        ESCALATION_STOPPED
     }
 }
