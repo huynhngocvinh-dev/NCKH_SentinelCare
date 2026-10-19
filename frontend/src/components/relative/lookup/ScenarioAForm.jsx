@@ -6,40 +6,33 @@ import api from "../../../services/api";
 export default function ScenarioAForm({
   phoneNumber,
   userData,
+  relativeCount = 1,
   onSubmitSuccess,
 }) {
-  const [escalationLevel, setEscalationLevel] = useState("2");
+  // Mặc định xếp cuối danh sách, người dùng có thể chọn vị trí khác
+  const [priority, setPriority] = useState(String(relativeCount + 1));
+  const [relationship, setRelationship] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const displayName = userData?.contactName || "Tài khoản SentinelCare";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
 
-    // Payload chuẩn hóa
     const payload = {
-      fullName:
-        userData?.contactName || userData?.name || "Người thân SentinelCare",
-      email: userData?.email || "user@sentinelcare.com",
+      fullName: displayName,
       activationPhone: phoneNumber.replace(/\s+/g, ""),
-      relationship: "Người nhận chính",
-      priorityOrder: parseInt(escalationLevel, 10),
+      relationship: relationship.trim() || "Người thân",
+      priorityOrder: parseInt(priority, 10),
     };
 
     try {
       const res = await api.post("/emergency-contacts", payload);
-
-      toast.success("Đã lưu Người nhận cảnh báo vào CSDL MySQL!");
-
-      // Gọi callback để trang cha RelativeManagementPage tự động reload lại danh sách
-      if (onSubmitSuccess) {
-        onSubmitSuccess(res.data);
-      }
+      toast.success("Đã thêm người nhận cảnh báo!");
+      if (onSubmitSuccess) onSubmitSuccess(res.data);
     } catch (err) {
-      toast.error(
-        err.response?.data?.message ||
-          err.message ||
-          "Lỗi khi lưu dữ liệu vào Backend!"
-      );
+      toast.error(err.message || "Không thể lưu người nhận cảnh báo!");
     } finally {
       setSubmitting(false);
     }
@@ -54,34 +47,52 @@ export default function ScenarioAForm({
         </span>
       </div>
 
-      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-bold text-sm flex items-center justify-center">
-            {userData?.contactName || userData?.name
-              ? (userData?.contactName || userData?.name)
-                  .charAt(0)
-                  .toUpperCase()
-              : "SC"}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h4 className="font-bold text-sm text-slate-900">
-                {userData?.contactName ||
-                  userData?.name ||
-                  "Tài khoản SentinelCare"}
-              </h4>
-              <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded">
-                Đã xác thực
-              </span>
-            </div>
-            <p className="text-xs text-slate-500">
-              {userData?.email || "Chưa cập nhật email"}
-            </p>
-          </div>
+      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-3">
+        <div className="w-12 h-12 rounded-full bg-blue-600 text-white font-bold text-sm flex items-center justify-center">
+          {displayName.charAt(0).toUpperCase()}
         </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <h4 className="font-bold text-sm text-slate-900">{displayName}</h4>
+            <span className="bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded">
+              Đã xác thực
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 font-mono">{phoneNumber}</p>
+        </div>
+      </div>
 
-        <div className="text-[11px] font-bold text-emerald-600 bg-emerald-100/60 px-2.5 py-1 rounded-lg">
-          🔔 Sẵn sàng nhận Push App & SMS
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">
+            Mức ưu tiên:
+          </label>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value)}
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600"
+          >
+            {Array.from({ length: relativeCount + 1 }, (_, i) => i + 1).map(
+              (n) => (
+                <option key={n} value={n}>
+                  Ưu tiên {n}
+                </option>
+              )
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">
+            Mối quan hệ:{" "}
+            <span className="text-slate-400 font-normal">(Tùy chọn)</span>
+          </label>
+          <input
+            type="text"
+            value={relationship}
+            onChange={(e) => setRelationship(e.target.value)}
+            placeholder="Vd: Con trai, Hàng xóm..."
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600"
+          />
         </div>
       </div>
 
@@ -91,11 +102,7 @@ export default function ScenarioAForm({
         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50"
       >
         <FiUserPlus className="w-4 h-4" />
-        <span>
-          {submitting
-            ? "Đang lưu..."
-            : "+ Thêm Người nhận cảnh báo (Hoàn tất 1-chạm)"}
-        </span>
+        <span>{submitting ? "Đang lưu..." : "+ Thêm Người nhận cảnh báo"}</span>
       </button>
     </form>
   );

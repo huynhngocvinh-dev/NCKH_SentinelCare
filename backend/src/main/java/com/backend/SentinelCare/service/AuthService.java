@@ -2,9 +2,13 @@ package com.backend.SentinelCare.service;
 
 import com.backend.SentinelCare.dto.*;
 import com.backend.SentinelCare.model.Account;
+import com.backend.SentinelCare.model.ServicePackage;
+import com.backend.SentinelCare.repository.ServicePackageRepository;
 import com.backend.SentinelCare.model.UserProfile;
+import com.backend.SentinelCare.model.UserSubscription;
 import com.backend.SentinelCare.repository.AccountRepository;
 import com.backend.SentinelCare.repository.UserProfileRepository;
+import com.backend.SentinelCare.repository.UserSubscriptionRepository;
 import com.backend.SentinelCare.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
@@ -27,6 +32,9 @@ public class AuthService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final JwtTokenProvider tokenProvider;
     private final EmailService emailService;
+    private final ServicePackageRepository packageRepository;
+    private final UserSubscriptionRepository subscriptionRepository;
+    private final EmergencyContactService emergencyContactService;
 
     private static final String REDIS_REG_PREFIX = "REG_PENDING_EMAIL:";
     private static final String REDIS_OTP_COOLDOWN_PREFIX = "OTP_COOLDOWN_EMAIL:";
@@ -121,7 +129,21 @@ public class AuthService {
                 .build();
 
         account = accountRepository.save(account);
+        
+        ServicePackage freemiumPkg = packageRepository.findByCode("FREEMIUM")
+            .orElseThrow(() -> new RuntimeException("Lỗi cấu hình: Không tìm thấy gói FREEMIUM!"));
 
+        UserSubscription defaultSub = UserSubscription.builder()
+            .user(account)
+            .pkg(freemiumPkg)
+            .startAt(LocalDateTime.now())
+            .expiredAt(null) // Gói Freemium không có hạn dùng
+            .status(UserSubscription.SubscriptionStatus.ACTIVE)
+            .autoRenew(false)
+            .build();
+
+        subscriptionRepository.save(defaultSub);    
+        log.info("da khoi tao goi FREEMIUM mac dinh cho User ID {}", account.getId());
         UserProfile profile = UserProfile.builder()
                 .account(account)
                 .fullName(pendingData.getFullName())
@@ -129,6 +151,7 @@ public class AuthService {
                 .build();
 
         userProfileRepository.save(profile);
+        emergencyContactService.ensureOwnerContact(account);
 
         // Xóa Key khỏi Redis
         redisTemplate.delete(redisKey);

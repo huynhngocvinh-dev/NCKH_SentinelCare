@@ -41,27 +41,30 @@ public class SecurityConfig {
             
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                
-                // 1. CÁC ENDPOINT AUTH & PUBLIC (KHÔNG CẦN TOKEN)
+
+                // Đăng ký / đăng nhập
                 .requestMatchers(
-                    "/api/auth/login", 
-                    "/api/auth/register", 
-                    "/api/auth/verify-otp", 
-                    "/api/auth/resend-otp",
-                    "/api/incidents/**",
-                    "/ws-sentinel/**"
+                    "/api/auth/login",
+                    "/api/auth/register",
+                    "/api/auth/verify-otp",
+                    "/api/auth/resend-otp"
                 ).permitAll()
 
-                .requestMatchers(HttpMethod.GET, "/api/subscriptions/packages").permitAll()
-                
-                .requestMatchers("/api/admin/packages/**").hasRole("ADMIN")
-                
-                .requestMatchers("/api/subscriptions/purchase", "/api/subscriptions/cancel", "/api/subscriptions/my-subscription").authenticated()
+                // WebSocket (tạm thời mở, sẽ siết ở Bước 2 khi chuyển sang cookie)
+                .requestMatchers("/ws-sentinel/**").permitAll()
 
-                //  CÁC ENDPOINT KHÁC YÊU CẦU XÁC THỰC
-                .requestMatchers("/api/auth/me").authenticated()
-                .requestMatchers("/api/devices/**", "/api/emergency-contacts/**").authenticated()
-                
+                // Thiết bị gọi vào: xác thực bằng header X-Device-Key trong controller
+                .requestMatchers(HttpMethod.POST,
+                    "/api/incidents/webhook/camera",
+                    "/api/incidents/iot-event").permitAll()
+
+                // Link xác nhận trong email: xác thực bằng token ký HMAC
+                .requestMatchers(HttpMethod.GET, "/api/incidents/*/acknowledge").permitAll()
+
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions/packages").permitAll()
+                .requestMatchers("/api/admin/packages/**").hasRole("ADMIN")
+
+                // Mọi endpoint còn lại bắt buộc đăng nhập
                 .anyRequest().authenticated()
             )
 

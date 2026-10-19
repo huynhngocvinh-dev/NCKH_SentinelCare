@@ -4,9 +4,8 @@ import { toast } from "react-toastify";
 import api from "../../../services/api";
 
 const isValidVietnamesePhone = (phoneStr) => {
-  if (!phoneStr) return true;
+  if (!phoneStr) return false;
   const cleanPhone = phoneStr.replace(/\s+/g, "");
-
   return /^(0[35789]\d{8}|\+84[35789]\d{8})$/.test(cleanPhone);
 };
 
@@ -15,12 +14,17 @@ const isValidEmail = (emailStr) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr);
 };
 
-export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
+export default function ScenarioBForm({
+  initialPhone,
+  relativeCount = 1,
+  onSubmitSuccess,
+}) {
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     activationPhone: initialPhone || "",
     relationship: "",
+    priority: String(relativeCount + 1),
   });
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -41,10 +45,7 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
     if (formData.email && !isValidEmail(formData.email.trim())) {
       newErrors.email = "Email không đúng định dạng!";
     }
-    if (
-      formData.activationPhone &&
-      !isValidVietnamesePhone(formData.activationPhone.trim())
-    ) {
+    if (!isValidVietnamesePhone(formData.activationPhone.trim())) {
       newErrors.activationPhone = "Số điện thoại không đúng định dạng!";
     }
 
@@ -58,29 +59,18 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
 
     const payload = {
       fullName: formData.fullName.trim(),
-      email: formData.email.trim() || "chua_co_email@domain.com",
-      activationPhone: (formData.activationPhone || initialPhone).replace(
-        /\s+/g,
-        ""
-      ),
-      relationship: formData.relationship.trim() || "Hàng xóm sao lưu",
-      priorityOrder: 2,
+      email: formData.email.trim(),
+      activationPhone: formData.activationPhone.replace(/\s+/g, ""),
+      relationship: formData.relationship.trim() || "Người thân",
+      priorityOrder: parseInt(formData.priority, 10),
     };
 
     try {
       const res = await api.post("/emergency-contacts", payload);
-
-      toast.success("Đã thêm liên hệ cứu hộ dự phòng vào CSDL!");
-
-      if (onSubmitSuccess) {
-        onSubmitSuccess(res.data);
-      }
+      toast.success("Đã thêm người nhận cảnh báo!");
+      if (onSubmitSuccess) onSubmitSuccess(res.data);
     } catch (err) {
-      toast.error(
-        err.response?.data?.message ||
-          err.message ||
-          "Không thể lưu liên hệ cứu hộ!"
-      );
+      toast.error(err.message || "Không thể lưu liên hệ cứu hộ!");
     } finally {
       setSubmitting(false);
     }
@@ -94,8 +84,8 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
           <strong className="block font-bold">
             Số điện thoại ({initialPhone}) chưa có tài khoản trên ứng dụng.
           </strong>
-          Vui lòng điền thêm Tên và Email để hệ thống tự động gửi cảnh báo khẩn
-          cấp qua tin nhắn SMS và Email y tế.
+          Vui lòng điền thêm tên (và email nếu muốn nhận cảnh báo qua email) để
+          hệ thống liên hệ khi có sự cố.
         </div>
       </div>
 
@@ -155,7 +145,7 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Số điện thoại nhận SMS/Gọi:
+              Số điện thoại nhận cuộc gọi: *
             </label>
             <input
               type="text"
@@ -194,6 +184,27 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
               className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">
+            Mức ưu tiên:
+          </label>
+          <select
+            value={formData.priority}
+            onChange={(e) =>
+              setFormData({ ...formData, priority: e.target.value })
+            }
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600"
+          >
+            {Array.from({ length: relativeCount + 1 }, (_, i) => i + 1).map(
+              (n) => (
+                <option key={n} value={n}>
+                  Ưu tiên {n}
+                </option>
+              )
+            )}
+          </select>
         </div>
       </div>
 

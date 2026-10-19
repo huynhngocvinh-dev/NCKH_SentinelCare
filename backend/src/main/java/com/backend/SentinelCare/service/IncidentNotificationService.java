@@ -1,6 +1,7 @@
 package com.backend.SentinelCare.service;
 
 import com.backend.SentinelCare.model.Account;
+import com.backend.SentinelCare.model.CameraDevice;
 import com.backend.SentinelCare.model.EmergencyContact;
 import com.backend.SentinelCare.model.FallIncident;
 import com.backend.SentinelCare.repository.EmergencyContactRepository;
@@ -72,13 +73,11 @@ public class IncidentNotificationService {
         messagingTemplate.convertAndSend("/topic/incidents", wsData);
         log.info("[WEBSOCKET] da gui thong bao su co len ID {} len WebApp", incident.getId());
 
-        // Lấy Account và danh sách EmergencyContact đúng theo Bệnh nhân
+        // Lấy Account và danh sách EmergencyContact
         Account account = extractAccountFromIncident(incident);
         Long accountId = account != null ? account.getId() : null;
 
-        List<EmergencyContact> contacts = (incident.getPatient() != null)
-                ? contactRepository.findByPatientId(incident.getPatient().getId())
-                : contactRepository.findAll();
+        List<EmergencyContact> contacts = loadContacts(accountId);
 
         // 2. Gửi Email kèm Audio TTS nếu tài khoản sở hữu Feature ALERT_EMAIL
         if (accountId != null && subscriptionService.hasFeatureAccess(accountId, "ALERT_EMAIL")) {
@@ -119,9 +118,7 @@ public class IncidentNotificationService {
                 if (accountId != null && subscriptionService.hasFeatureAccess(accountId, "CALL_ALERT")) {
                     log.warn(" [TIMEOUT 5S] lap tuc kich hoat cuoc goi xoay vong qua Stringee!");
 
-                    List<EmergencyContact> contacts = (incident.getPatient() != null)
-                            ? contactRepository.findByPatientId(incident.getPatient().getId())
-                            : contactRepository.findAll();
+                    List<EmergencyContact> contacts = loadContacts(accountId);
 
                     voipCallService.triggerEscalationCallWorkflow(incident.getId(), contacts, alertText);
                 } else {
@@ -157,9 +154,28 @@ public class IncidentNotificationService {
     }
 
     private Account extractAccountFromIncident(FallIncident incident) {
+        // 1. Luồng IoT Device: Lấy Account chính chủ qua MonitoredSubject (Patient)
         if (incident.getPatient() != null && incident.getPatient().getAccount() != null) {
             return incident.getPatient().getAccount();
         }
+    
+        // 2. Luồng Camera AI: Lấy Account chính chủ sở hữu vị trí/địa chỉ đặt Camera
+        if (incident.getCameraDevice() != null) { 
+            CameraDevice camera = incident.getCameraDevice();
+            if (camera.getAddress() != null && camera.getAddress().getAccount() != null) {
+                return camera.getAddress().getAccount();
+            }
+        }
+    
         return null;
+    }
+
+    // Chỉ lấy người thân của đúng tài khoản chủ, đã xếp theo mức ưu tiên
+    private List<EmergencyContact> loadContacts(Long accountId) {
+        if (accountId == null) {
+            log.warn("Không xác định được tài khoản chủ của sự cố, không gửi cảnh báo cho ai.");
+            return List.of();
+        }
+        return contactRepository.findByAccountIdOrderByPriorityOrderAsc(accountId);
     }
 }

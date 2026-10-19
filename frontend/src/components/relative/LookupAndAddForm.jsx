@@ -7,12 +7,10 @@ import Step1PhoneLookup from "./lookup/Step1PhoneLookup";
 
 const isValidVietnamesePhone = (phoneStr) => {
   const cleanPhone = phoneStr.replace(/\s+/g, "");
-  return /(^(0[3|5|7|8|9])([0-9]{8})$)|(^\+84[3|5|7|8|9]([0-9]{8})$)/.test(
-    cleanPhone
-  );
+  return /^(0[35789]\d{8}|\+84[35789]\d{8})$/.test(cleanPhone);
 };
 
-export default function LookupAndAddForm({ onAddSuccess }) {
+export default function LookupAndAddForm({ onAddSuccess, relativeCount = 1 }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [activeScenario, setActiveScenario] = useState("A");
   const [searching, setSearching] = useState(false);
@@ -38,7 +36,6 @@ export default function LookupAndAddForm({ onAddSuccess }) {
 
     try {
       const cleanPhone = phoneNumber.replace(/\s+/g, "");
-
       const res = await api.get(
         `/emergency-contacts/check-phone?phone=${encodeURIComponent(
           cleanPhone
@@ -50,9 +47,8 @@ export default function LookupAndAddForm({ onAddSuccess }) {
       setActiveScenario("A");
       toast.success(`Đã tìm thấy tài khoản liên kết với số ${cleanPhone}!`);
     } catch (err) {
-      setHasSearched(true);
-      // Nếu Backend trả về 404 (Không tìm thấy số điện thoại)
       if (err.response?.status === 404) {
+        setHasSearched(true);
         setFoundUserData(null);
         setActiveScenario("B");
         toast.warn("Số điện thoại này chưa đăng ký tài khoản!");
@@ -98,12 +94,6 @@ export default function LookupAndAddForm({ onAddSuccess }) {
         searching={searching}
         phoneError={phoneError}
         setPhoneError={setPhoneError}
-        activeScenario={activeScenario}
-        hasSearched={hasSearched}
-        onForceScenario={(sc) => {
-          setActiveScenario(sc);
-          setHasSearched(true);
-        }}
       />
 
       {hasSearched && (
@@ -119,11 +109,13 @@ export default function LookupAndAddForm({ onAddSuccess }) {
             <ScenarioAForm
               phoneNumber={phoneNumber}
               userData={foundUserData}
+              relativeCount={relativeCount}
               onSubmitSuccess={handleSuccess}
             />
           ) : (
             <ScenarioBForm
               initialPhone={phoneNumber}
+              relativeCount={relativeCount}
               onSubmitSuccess={handleSuccess}
             />
           )}

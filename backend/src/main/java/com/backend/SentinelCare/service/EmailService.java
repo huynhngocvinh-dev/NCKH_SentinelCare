@@ -16,6 +16,10 @@ import org.springframework.stereotype.Service;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final com.backend.SentinelCare.security.AckTokenService ackTokenService;
+
+    @org.springframework.beans.factory.annotation.Value("${app.public-base-url}")
+    private String publicBaseUrl;
 
     @Async
     public void sendOtpEmail(String toEmail, String otpCode) {
@@ -59,7 +63,8 @@ public class EmailService {
             helper.setSubject("🚨 [CẢNH BÁO KHẨN CẤP] Phát hiện sự cố từ SentinelCare!");
 
             // Đường dẫn API gọi thẳng Backend để xác nhận ngắt gọi GSM
-            String acknowledgeUrl = "http://localhost:8080/api/incidents/" + incidentId + "/acknowledge";
+            String acknowledgeUrl = publicBaseUrl + "/api/incidents/" + incidentId
+            + "/acknowledge?token=" + ackTokenService.generate(incidentId);
 
             String htmlContent = String.format("""
                 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f8fafc;">

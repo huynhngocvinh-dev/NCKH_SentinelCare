@@ -3,7 +3,6 @@ import { toast } from "react-toastify";
 
 import api from "../services/api";
 import RelativeHeader from "../components/relative/RelativeHeader";
-// import PatientInfoCard from "../components/relative/PatientInfoCard";
 import EscalationMechanism from "../components/relative/EscalationMechanism";
 import RelativeList from "../components/relative/RelativeList";
 import LookupAndAddForm from "../components/relative/LookupAndAddForm";
@@ -13,14 +12,12 @@ export default function RelativeManagementPage() {
   const [relatives, setRelatives] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchRelatives = async () => {
-    setLoading(true);
+  const fetchRelatives = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      //Gọi API thông qua instance 'api', Interceptor sẽ tự động chèn Token
       const res = await api.get("/emergency-contacts");
       setRelatives(res.data);
     } catch (err) {
-      // Interceptor đã chuẩn hóa thông điệp lỗi trong err.message
       toast.error(
         err.message || "Không thể tải danh sách người thân từ hệ thống."
       );
@@ -33,33 +30,44 @@ export default function RelativeManagementPage() {
     fetchRelatives();
   }, []);
 
-  const handleAddRelativeSuccess = () => {
-    fetchRelatives();
+  // Đổi vị trí 1 người lên (-1) hoặc xuống (+1), lưu thứ tự mới lên server
+  const handleMove = async (index, direction) => {
+    const target = index + direction;
+    if (target < 0 || target >= relatives.length) return;
+
+    const next = [...relatives];
+    [next[index], next[target]] = [next[target], next[index]];
+    setRelatives(next);
+
+    try {
+      await api.put("/emergency-contacts/reorder", {
+        orderedIds: next.map((r) => r.id),
+      });
+      fetchRelatives(true);
+    } catch (err) {
+      toast.error(err.message || "Không thể đổi thứ tự ưu tiên!");
+      fetchRelatives(true);
+    }
   };
 
-  const handleCall = (phone) => {
-    toast.info(`📞 Đang quay số tới: ${phone}`);
-  };
-
-  const handleSms = (phone) => {
-    toast.info(`✉️ Đang soạn tin nhắn SMS tới: ${phone}`);
+  const handleDelete = async (relative) => {
+    if (!window.confirm(`Xóa ${relative.contactName} khỏi danh sách?`)) return;
+    try {
+      await api.delete(`/emergency-contacts/${relative.id}`);
+      toast.success("Đã xóa người thân.");
+      fetchRelatives(true);
+    } catch (err) {
+      toast.error(err.message || "Không thể xóa người thân!");
+    }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header Bar */}
         <RelativeHeader />
-
-        {/* Thẻ Sinh hiệu Người Giám Sát */}
-        {/* <PatientInfoCard /> */}
-
-        {/* Cơ chế leo thang */}
         <EscalationMechanism />
 
-        {/* Khung nội dung 2 Cột */}
         <div className="grid lg:grid-cols-12 gap-6">
-          {/* Cột trái: Danh sách người thân ưu tiên từ CSDL */}
           <div className="lg:col-span-7">
             {loading ? (
               <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center text-slate-500 font-medium animate-pulse">
@@ -68,19 +76,20 @@ export default function RelativeManagementPage() {
             ) : (
               <RelativeList
                 relatives={relatives}
-                onCall={handleCall}
-                onSms={handleSms}
+                onMove={handleMove}
+                onDelete={handleDelete}
               />
             )}
           </div>
 
-          {/* Cột phải: Tra cứu & Thêm người nhận cảnh báo */}
           <div className="lg:col-span-5">
-            <LookupAndAddForm onAddSuccess={handleAddRelativeSuccess} />
+            <LookupAndAddForm
+              relativeCount={relatives.length}
+              onAddSuccess={() => fetchRelatives(true)}
+            />
           </div>
         </div>
 
-        {/* Khung Cài Đặt Chung */}
         <GeneralSettings />
       </div>
     </div>
