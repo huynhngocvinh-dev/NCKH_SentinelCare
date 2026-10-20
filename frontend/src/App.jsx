@@ -8,6 +8,10 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import DeviceSetupSection from "./pages/DeviceSetupSection.jsx";
 import RelativeManagementPage from "./pages/RelativeManagementPage.jsx";
 
+//Gói dịch vụ
+import PricingPage from "./pages/PricingPage.jsx";
+import SubscriptionManagePage from "./pages/SubscriptionManagePage.jsx";
+
 export default function App() {
   return (
     <Routes>
@@ -23,6 +27,11 @@ export default function App() {
       {/* test bỏ ngoài ,sau khi test xong bỏ vào ProtectedRouter */}
       <Route path="/cai-dat-thiet-bi" element={<DeviceSetupSection />} />
       <Route path="/nguoi-than" element={<RelativeManagementPage />} />
+      
+      {/* Route test Gói dịch vụ*/}
+      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/subscription" element={<SubscriptionManagePage />} />
+
       <Route
         path="/dashboard"
         element={

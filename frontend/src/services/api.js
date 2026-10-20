@@ -34,4 +34,15 @@ export const authApi = {
   me: () => api.get('/auth/me'),
 }
 
+export const subscriptionApi = {
+  // 1. Lấy danh sách gói (Public)
+  getPackages: () => api.get('/subscriptions/packages'),
+  
+  // 2. Mua / Nâng cấp gói (Truyền packageId và paymentGateway qua payload)
+  purchase: (userId, payload) => api.post(`/subscriptions/purchase?userId=${userId}`, payload),
+  
+  // 3. Hủy gói / Tắt tự động gia hạn
+  cancel: (userId, cancelImmediately) => api.post(`/subscriptions/cancel?userId=${userId}&cancelImmediately=${cancelImmediately}`),
+}
+
 export default api
