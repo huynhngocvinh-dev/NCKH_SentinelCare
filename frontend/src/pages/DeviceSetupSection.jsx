@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { FiVideo, FiRadio, FiCheck, FiWatch } from "react-icons/fi";
 import { toast } from "react-toastify";
 
 import HeaderBar from "../components/setup/HeaderBar";
 import HardwareStatusGrid from "../components/setup/HardwareStatusGrid";
 import WearableForm from "../components/setup/WearableForm";
-import CameraScanPanel from "../components/setup/CameraScanPanel"; // IMPORT COMPONENT MỚI
+import CameraScanPanel from "../components/setup/CameraScanPanel";
 import CameraForm from "../components/setup/CameraForm";
 import ConfiguredDevicesList from "../components/setup/ConfiguredDevicesList";
-
-const API_BASE = "http://localhost:8080/api/devices";
+import api from "../services/api";
 
 const INITIAL_FOUND_DEVICES = [
   {
@@ -42,7 +41,7 @@ export default function DeviceSetupSection() {
   });
   const [wearableErrors, setWearableErrors] = useState({});
 
-  const [isScanning, setIsScanning] = useState(true);
+  const [isScanning, setIsScanning] = useState(false);
   const [scannedDevices, setScannedDevices] = useState(INITIAL_FOUND_DEVICES);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
 
@@ -63,15 +62,14 @@ export default function DeviceSetupSection() {
     fetchDevices();
   }, []);
 
+  // 🟢 1. LẤY DANH SÁCH THIẾT BỊ TỪ BACKEND
   const fetchDevices = async () => {
     try {
-      const res = await fetch(API_BASE);
-      if (res.ok) {
-        const data = await res.json();
-        setConfiguredDevices(data);
-      }
-    } catch {
-      // Offline fallback
+      const res = await api.get("/devices");
+      setConfiguredDevices(res.data);
+    } catch (err) {
+      console.error("Lỗi lấy danh sách thiết bị:", err);
+      // Không tự ý set mock data ở đây để đảm bảo giao diện phản ánh đúng CSDL
     }
   };
 
@@ -89,7 +87,6 @@ export default function DeviceSetupSection() {
     }
   };
 
-  // Hàm nhận Mã Serial từ việc Quét QR hoặc Nhập ID và tự điền sang Form bên phải
   const handleApplyCameraSerial = (serial) => {
     handleCameraChange("serialNumber", serial);
   };
@@ -97,31 +94,37 @@ export default function DeviceSetupSection() {
   const handleSelectDevice = (device) => {
     setSelectedDeviceId(device.id);
     handleWearableChange("serialNumber", device.id);
-    toast.success(`Đã chọn thiết bị: ${device.name}`);
+    toast.info(`Đã chọn thiết bị: ${device.name}`);
   };
 
   const handleScanBluetooth = async () => {
     setIsScanning(true);
     try {
-      if (navigator.bluetooth) {
-        const device = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-        });
-        const newDevice = {
-          id: device.id || `FG-BLE-${Math.floor(1000 + Math.random() * 9000)}`,
-          name: device.name || "FallGuard BLE Device",
-          rssi: -45,
-          signalText: "Tín hiệu rất tốt",
-          battery: 100,
-        };
-        setScannedDevices((prev) => [newDevice, ...prev]);
-        handleSelectDevice(newDevice);
-      } else {
-        toast.info("Đang dò lại sóng Radar xung quanh...");
-        setTimeout(() => setIsScanning(false), 1500);
+      if (!navigator.bluetooth) {
+        toast.error("Trình duyệt không hỗ trợ Web Bluetooth API!");
+        return;
       }
+
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+      });
+
+      const newDevice = {
+        id: device.id || `FG-BLE-${Math.floor(1000 + Math.random() * 9000)}`,
+        name: device.name || "FallGuard BLE Device",
+        rssi: -45,
+        signalText: "Tín hiệu rất tốt",
+        battery: 100,
+      };
+
+      setScannedDevices((prev) => [newDevice, ...prev]);
+      handleSelectDevice(newDevice);
+      toast.success(`Đã tìm thấy thiết bị: ${newDevice.name}`);
     } catch (err) {
-      console.log("Hủy quét BLE:", err);
+      if (err.name !== "NotFoundError") {
+        // Không báo lỗi nếu người dùng tự hủy chọn
+        toast.error("Lỗi khi kết nối Bluetooth!");
+      }
     } finally {
       setIsScanning(false);
     }
@@ -132,7 +135,7 @@ export default function DeviceSetupSection() {
     if (!wearableData.serialNumber.trim())
       errors.serialNumber = "Mã Serial là bắt buộc";
     if (!wearableData.subjectFullName.trim())
-      errors.subjectFullName = "Họ tên là bắt buộc";
+      errors.subjectFullName = "Họ tên người được giám sát là bắt buộc";
     if (!wearableData.subjectDob) errors.subjectDob = "Ngày sinh là bắt buộc";
     setWearableErrors(errors);
     return Object.keys(errors).length === 0;
@@ -157,18 +160,24 @@ export default function DeviceSetupSection() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/wearable`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(wearableData),
-      });
+      const res = await api.post("/devices/wearable", wearableData);
+      toast.success(res.data?.message || "Ghép nối thiết bị đeo thành công!");
 
-      if (res.ok) {
-        toast.success("Ghép nối thiết bị thành công!");
-        fetchDevices();
-      } else throw new Error();
-    } catch {
-      toast.success("Ghép nối thiết bị thành công (Giả lập UI)!");
+      // Reset form sau khi gửi thành công
+      setWearableData({
+        serialNumber: "",
+        subjectFullName: "",
+        subjectGender: "",
+        subjectDob: "",
+        medicalHistory: "",
+        wearPosition: "",
+      });
+      setSelectedDeviceId("");
+      fetchDevices(); // Load lại danh sách thiết bị thực từ server
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.message || err.message || "Ghép nối thất bại!";
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -183,18 +192,24 @@ export default function DeviceSetupSection() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/camera`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cameraData),
-      });
+      const res = await api.post("/devices/camera", cameraData);
+      toast.success(res.data?.message || "Lưu Camera thành công!");
 
-      if (res.ok) {
-        toast.success("Lưu Camera thành công!");
-        fetchDevices();
-      } else throw new Error();
-    } catch {
-      toast.success("Kích hoạt Camera thành công (Giả lập UI)!");
+      // Reset form camera sau khi lưu thành công
+      setCameraData({
+        cameraName: "",
+        serialNumber: "",
+        roomLocation: "",
+        cameraAngle: "",
+        enableTwoWayIntercom: true,
+      });
+      fetchDevices(); // Load lại danh sách thiết bị thực từ server
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.message ||
+        err.message ||
+        "Kích hoạt Camera thất bại!";
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -343,14 +358,12 @@ export default function DeviceSetupSection() {
           </div>
         )}
 
-        {/* Tab 2: Camera (Cập nhật dùng CameraScanPanel) */}
+        {/* Tab 2: Camera */}
         {activeTab === "camera" && (
           <div className="grid lg:grid-cols-12 gap-6">
             <div className="lg:col-span-5 space-y-4">
-              {/* COMPONENT QUÉT QR CODE / NHẬP MÃ ID THỦ CÔNG */}
               <CameraScanPanel onApplySerial={handleApplyCameraSerial} />
 
-              {/* LIVE STREAM RTSP PREVIEW */}
               <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div className="flex justify-between items-center text-xs font-bold">
                   <span className="flex items-center gap-2 text-blue-600">
@@ -389,7 +402,16 @@ export default function DeviceSetupSection() {
                 onChange={handleCameraChange}
                 onSubmit={handleCameraSubmit}
                 submitting={submitting}
-                onCancel={() => toast.info("Đã hủy thao tác.")}
+                onCancel={() => {
+                  setCameraData({
+                    cameraName: "",
+                    serialNumber: "",
+                    roomLocation: "",
+                    cameraAngle: "",
+                    enableTwoWayIntercom: true,
+                  });
+                  toast.info("Đã làm mới Form Camera.");
+                }}
               />
             </div>
           </div>

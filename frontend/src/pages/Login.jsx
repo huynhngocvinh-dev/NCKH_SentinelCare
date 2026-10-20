@@ -14,7 +14,6 @@ import {
 import { FcGoogle } from "react-icons/fc";
 import AuthShell from "../components/AuthShell.jsx";
 import FormField from "../components/FormField.jsx";
-import Button from "../components/Button.jsx";
 import { authApi } from "../services/api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { validateLoginForm } from "../utils/validators.js";
@@ -50,11 +49,11 @@ export default function Login() {
     setSubmitting(true);
     try {
       const { data } = await authApi.login({
-        identifier: values.identifier.trim(),
+        email: values.identifier.trim(),
         password: values.password,
       });
-      login(data.accessToken, data.user);
-      toast.success(`Chào mừng trở lại, ${data.user.fullName || "Bạn"}!`);
+      login(data.token, data);
+      toast.success(`Chào mừng trở lại, ${data.fullName || "Bạn"}!`);
       navigate(redirectTo, { replace: true });
     } catch (err) {
       if (err.response?.data?.requiresVerification) {
@@ -235,7 +234,7 @@ export default function Login() {
           disabled={submitting}
           className="w-full bg-[#0052cc] hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-70"
         >
-          <span>Đăng nhập vào Hệ thống</span>
+          <span>Đăng nhập</span>
           <FiArrowRight className="w-4 h-4" />
         </button>
       </form>
@@ -262,7 +261,7 @@ export default function Login() {
       <p className="mt-6 text-center text-xs text-slate-500 font-medium">
         Chưa có tài khoản?{" "}
         <Link to="/dang-ky" className="font-bold text-blue-600 hover:underline">
-          Đăng ký ngay miễn phí
+          Đăng ký ngay
         </Link>
       </p>
 

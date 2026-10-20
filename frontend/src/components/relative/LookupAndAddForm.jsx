@@ -1,22 +1,22 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { toast } from "react-toastify";
+import api from "../../services/api";
 import ScenarioAForm from "./lookup/ScenarioAForm";
 import ScenarioBForm from "./lookup/ScenarioBForm";
 import Step1PhoneLookup from "./lookup/Step1PhoneLookup";
 
 const isValidVietnamesePhone = (phoneStr) => {
   const cleanPhone = phoneStr.replace(/\s+/g, "");
-  return /(^(0[3|5|7|8|9])+([0-9]{8})$)|(^\+84[3|5|7|8|9]+([0-9]{8})$)/.test(
-    cleanPhone
-  );
+  return /^(0[35789]\d{8}|\+84[35789]\d{8})$/.test(cleanPhone);
 };
 
-export default function LookupAndAddForm({ onAddSuccess }) {
+export default function LookupAndAddForm({ onAddSuccess, relativeCount = 1 }) {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [activeScenario, setActiveScenario] = useState("A");
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [phoneError, setPhoneError] = useState("");
+  const [foundUserData, setFoundUserData] = useState(null);
 
   const handleLookup = async () => {
     if (!phoneNumber.trim()) {
@@ -26,8 +26,8 @@ export default function LookupAndAddForm({ onAddSuccess }) {
     }
 
     if (!isValidVietnamesePhone(phoneNumber.trim())) {
-      setPhoneError("Số điện thoại không đúng định dạng!");
-      toast.error("Số điện thoại không đúng định dạng Việt Nam!");
+      setPhoneError("Số điện thoại không đúng định dạng Việt Nam!");
+      toast.error("Số điện thoại không đúng định dạng!");
       return;
     }
 
@@ -35,26 +35,26 @@ export default function LookupAndAddForm({ onAddSuccess }) {
     setSearching(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 800));
       const cleanPhone = phoneNumber.replace(/\s+/g, "");
-      const lastDigit = parseInt(cleanPhone.slice(-1), 10);
-      const isAccountFound = !isNaN(lastDigit) && lastDigit % 2 === 0;
+      const res = await api.get(
+        `/emergency-contacts/check-phone?phone=${encodeURIComponent(
+          cleanPhone
+        )}`
+      );
 
       setHasSearched(true);
-
-      if (isAccountFound) {
-        setActiveScenario("A");
-        toast.success(
-          `Đã tìm thấy tài khoản SentinelCare liên kết với số ${phoneNumber}!`
-        );
-      } else {
-        setActiveScenario("B");
-        toast.warn(
-          "Số điện thoại này chưa đăng ký tài khoản! Hệ thống đã chuyển sang biểu mẫu nhập thông tin dự phòng."
-        );
-      }
+      setFoundUserData(res.data);
+      setActiveScenario("A");
+      toast.success(`Đã tìm thấy tài khoản liên kết với số ${cleanPhone}!`);
     } catch (err) {
-      toast.error("Lỗi kết nối trạm kiểm soát!");
+      if (err.response?.status === 404) {
+        setHasSearched(true);
+        setFoundUserData(null);
+        setActiveScenario("B");
+        toast.warn("Số điện thoại này chưa đăng ký tài khoản!");
+      } else {
+        toast.error(err.message || "Không thể kết nối tới máy chủ Backend!");
+      }
     } finally {
       setSearching(false);
     }
@@ -62,9 +62,9 @@ export default function LookupAndAddForm({ onAddSuccess }) {
 
   const handleSuccess = (newRelative) => {
     onAddSuccess(newRelative);
-    toast.success("Thêm người nhận cảnh báo thành công!");
     setHasSearched(false);
     setPhoneNumber("");
+    setFoundUserData(null);
   };
 
   return (
@@ -94,12 +94,6 @@ export default function LookupAndAddForm({ onAddSuccess }) {
         searching={searching}
         phoneError={phoneError}
         setPhoneError={setPhoneError}
-        activeScenario={activeScenario}
-        hasSearched={hasSearched}
-        onForceScenario={(sc) => {
-          setActiveScenario(sc);
-          setHasSearched(true);
-        }}
       />
 
       {hasSearched && (
@@ -114,11 +108,14 @@ export default function LookupAndAddForm({ onAddSuccess }) {
           {activeScenario === "A" ? (
             <ScenarioAForm
               phoneNumber={phoneNumber}
+              userData={foundUserData}
+              relativeCount={relativeCount}
               onSubmitSuccess={handleSuccess}
             />
           ) : (
             <ScenarioBForm
               initialPhone={phoneNumber}
+              relativeCount={relativeCount}
               onSubmitSuccess={handleSuccess}
             />
           )}

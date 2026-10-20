@@ -8,9 +8,6 @@ export default function Step1PhoneLookup({
   searching,
   phoneError,
   setPhoneError,
-  activeScenario,
-  hasSearched,
-  onForceScenario,
 }) {
   return (
     <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100 space-y-3">
@@ -54,37 +51,6 @@ export default function Step1PhoneLookup({
       {phoneError && (
         <p className="text-xs text-red-500 font-medium">{phoneError}</p>
       )}
-
-      {/* Dev Switcher */}
-      <div className="flex items-center justify-between pt-2 border-t border-blue-100/60 text-xs">
-        <span className="text-slate-500 text-[11px]">
-          ===============================
-        </span>
-        <div className="flex gap-1.5">
-          <button
-            type="button"
-            onClick={() => onForceScenario("A")}
-            className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
-              activeScenario === "A" && hasSearched
-                ? "bg-white text-blue-600 shadow-sm border border-blue-200"
-                : "text-slate-400 hover:bg-blue-100/50"
-            }`}
-          >
-            Đã đăng ký
-          </button>
-          <button
-            type="button"
-            onClick={() => onForceScenario("B")}
-            className={`px-2.5 py-1 rounded-lg font-bold text-[10px] transition-all cursor-pointer ${
-              activeScenario === "B" && hasSearched
-                ? "bg-white text-blue-600 shadow-sm border border-blue-200"
-                : "text-slate-400 hover:bg-blue-100/50"
-            }`}
-          >
-            Chưa đăng ký
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

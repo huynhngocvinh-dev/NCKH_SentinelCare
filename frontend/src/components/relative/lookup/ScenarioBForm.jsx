@@ -1,13 +1,12 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { FiAlertTriangle, FiSave } from "react-icons/fi";
 import { toast } from "react-toastify";
+import api from "../../../services/api";
 
 const isValidVietnamesePhone = (phoneStr) => {
-  if (!phoneStr) return true;
+  if (!phoneStr) return false;
   const cleanPhone = phoneStr.replace(/\s+/g, "");
-  return /(^(0[3|5|7|8|9])+([0-9]{8})$)|(^\+84[3|5|7|8|9]+([0-9]{8})$)/.test(
-    cleanPhone
-  );
+  return /^(0[35789]\d{8}|\+84[35789]\d{8})$/.test(cleanPhone);
 };
 
 const isValidEmail = (emailStr) => {
@@ -15,14 +14,20 @@ const isValidEmail = (emailStr) => {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailStr);
 };
 
-export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
+export default function ScenarioBForm({
+  initialPhone,
+  relativeCount = 1,
+  onSubmitSuccess,
+}) {
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     activationPhone: initialPhone || "",
     relationship: "",
+    priority: String(relativeCount + 1),
   });
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (initialPhone) {
@@ -30,7 +35,7 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
     }
   }, [initialPhone]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
 
@@ -40,10 +45,7 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
     if (formData.email && !isValidEmail(formData.email.trim())) {
       newErrors.email = "Email không đúng định dạng!";
     }
-    if (
-      formData.activationPhone &&
-      !isValidVietnamesePhone(formData.activationPhone.trim())
-    ) {
+    if (!isValidVietnamesePhone(formData.activationPhone.trim())) {
       newErrors.activationPhone = "Số điện thoại không đúng định dạng!";
     }
 
@@ -53,18 +55,25 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
       return;
     }
 
-    const newRelative = {
-      id: Date.now(),
-      name: formData.fullName,
-      role: formData.relationship || "Hàng xóm sao lưu",
-      roleBadgeStyle: "bg-slate-200 text-slate-700",
-      statusText: "Chưa nhận (SMS & Gọi)",
-      phone: formData.activationPhone || initialPhone,
-      email: formData.email || "chua_co_email@domain.com",
-      channelDesc: "Cuộc gọi tự động AI & SMS báo động sau 90s",
+    setSubmitting(true);
+
+    const payload = {
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      activationPhone: formData.activationPhone.replace(/\s+/g, ""),
+      relationship: formData.relationship.trim() || "Người thân",
+      priorityOrder: parseInt(formData.priority, 10),
     };
 
-    onSubmitSuccess(newRelative);
+    try {
+      const res = await api.post("/emergency-contacts", payload);
+      toast.success("Đã thêm người nhận cảnh báo!");
+      if (onSubmitSuccess) onSubmitSuccess(res.data);
+    } catch (err) {
+      toast.error(err.message || "Không thể lưu liên hệ cứu hộ!");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -75,8 +84,8 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
           <strong className="block font-bold">
             Số điện thoại ({initialPhone}) chưa có tài khoản trên ứng dụng.
           </strong>
-          Vui lòng điền thêm Tên và Email để hệ thống tự động gửi cảnh báo khẩn
-          cấp qua tin nhắn SMS và Email y tế.
+          Vui lòng điền thêm tên (và email nếu muốn nhận cảnh báo qua email) để
+          hệ thống liên hệ khi có sự cố.
         </div>
       </div>
 
@@ -136,8 +145,7 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Số điện thoại nhận SMS/Gọi:{" "}
-              <span className="text-slate-400 font-normal">(Tùy chọn)</span>
+              Số điện thoại nhận cuộc gọi: *
             </label>
             <input
               type="text"
@@ -177,14 +185,38 @@ export default function ScenarioBForm({ initialPhone, onSubmitSuccess }) {
             />
           </div>
         </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">
+            Mức ưu tiên:
+          </label>
+          <select
+            value={formData.priority}
+            onChange={(e) =>
+              setFormData({ ...formData, priority: e.target.value })
+            }
+            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600"
+          >
+            {Array.from({ length: relativeCount + 1 }, (_, i) => i + 1).map(
+              (n) => (
+                <option key={n} value={n}>
+                  Ưu tiên {n}
+                </option>
+              )
+            )}
+          </select>
+        </div>
       </div>
 
       <button
         type="submit"
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer"
+        disabled={submitting}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 text-sm cursor-pointer disabled:opacity-50"
       >
         <FiSave className="w-4 h-4" />
-        <span>Lưu & Thêm Người nhận cảnh báo</span>
+        <span>
+          {submitting ? "Đang lưu..." : "Lưu & Thêm Người nhận cảnh báo"}
+        </span>
       </button>
     </form>
   );
