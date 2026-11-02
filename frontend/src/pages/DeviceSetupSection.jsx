@@ -10,23 +10,6 @@ import CameraForm from "../components/setup/CameraForm";
 import ConfiguredDevicesList from "../components/setup/ConfiguredDevicesList";
 import api from "../services/api";
 
-const INITIAL_FOUND_DEVICES = [
-  {
-    id: "FG-2024-00123-PRO",
-    name: "FallGuard 3D Pro",
-    rssi: -42,
-    signalText: "Tín hiệu rất tốt",
-    battery: 96,
-  },
-  {
-    id: "FG-2026-88219-PRO",
-    name: "FallGuard Pro Medical Band v3",
-    rssi: -68,
-    signalText: "Tín hiệu trung bình",
-    battery: 82,
-  },
-];
-
 export default function DeviceSetupSection() {
   const [activeTab, setActiveTab] = useState("camera");
 
@@ -42,7 +25,7 @@ export default function DeviceSetupSection() {
   const [wearableErrors, setWearableErrors] = useState({});
 
   const [isScanning, setIsScanning] = useState(false);
-  const [scannedDevices, setScannedDevices] = useState(INITIAL_FOUND_DEVICES);
+  const [scannedDevices, setScannedDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
 
   // Camera State
@@ -110,13 +93,9 @@ export default function DeviceSetupSection() {
       });
 
       const newDevice = {
-        id: device.id || `FG-BLE-${Math.floor(1000 + Math.random() * 9000)}`,
-        name: device.name || "FallGuard BLE Device",
-        rssi: -45,
-        signalText: "Tín hiệu rất tốt",
-        battery: 100,
+        id: device.id || device.name,
+        name: device.name || "Thiết bị Bluetooth",
       };
-
       setScannedDevices((prev) => [newDevice, ...prev]);
       handleSelectDevice(newDevice);
       toast.success(`Đã tìm thấy thiết bị: ${newDevice.name}`);
@@ -305,9 +284,8 @@ export default function DeviceSetupSection() {
                               <h5 className="text-xs font-bold text-slate-800">
                                 {dev.name}
                               </h5>
-                              <p className="text-[11px] text-slate-500">
-                                RSSI: {dev.rssi}dBm • {dev.signalText} (Pin{" "}
-                                {dev.battery}%)
+                              <p className="text-[11px] text-slate-500 font-mono">
+                                Mã nhận diện: {dev.id}
                               </p>
                             </div>
                           </div>

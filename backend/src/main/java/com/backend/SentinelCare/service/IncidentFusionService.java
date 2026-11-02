@@ -7,6 +7,7 @@ import com.backend.SentinelCare.repository.FallIncidentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -19,24 +20,26 @@ public class IncidentFusionService {
 
     private final FallIncidentRepository incidentRepository;
 
-    /**
-     * Dung hợp sự cố Camera vào sự cố IoT sẵn có (nếu xảy ra trong vòng 5s)
+     /**
+     * Dung hợp sự cố Camera vào sự cố IoT sẵn có CỦA CÙNG TÀI KHOẢN (nếu xảy ra trong vòng 5s)
      */
-    public FallIncident fuseCameraEvent(CameraDevice camera, CameraWebhookRequest request) {
-        LocalDateTime thresholdTime = LocalDateTime.now().minusSeconds(5);
-        Optional<FallIncident> recentIncidentOpt = incidentRepository
-                .findFirstByIncidentTimeAfterAndStatusOrderByIncidentTimeDesc(thresholdTime, FallIncident.IncidentStatus.PENDING);
+     public FallIncident fuseCameraEvent(CameraDevice camera, CameraWebhookRequest request) {
+        Long accountId = (camera.getAddress() != null && camera.getAddress().getAccount() != null)
+                ? camera.getAddress().getAccount().getId()
+                : null;
+
+        Optional<FallIncident> recentIncidentOpt = findRecentPendingIncident(accountId);
 
         Float confidence = (request.getPerson() != null && request.getPerson().getBodyAngle() != null)
                 ? (float) (request.getPerson().getBodyAngle() / 90.0)
-                : 0.95f;
+                : null;
 
         if (recentIncidentOpt.isPresent()) {
             FallIncident incident = recentIncidentOpt.get();
             incident.setCameraDevice(camera);
             incident.setSnapshotUrl(request.getSnapshotBase64());
             incident.setConfidenceScore(confidence);
-            log.info("🔀 [FUSION] Gộp sự cố Camera ({}) vào Sự cố IoT (ID: {}) đang chờ!", camera.getCameraCode(), incident.getId());
+            log.info(" [FUSION] gop su co Camera ({}) vao su co IoT (ID: {}) dang cho!", camera.getCameraCode(), incident.getId());
             return incident;
         }
 
@@ -50,12 +53,14 @@ public class IncidentFusionService {
     }
 
     /**
-     * Dung hợp sự cố IoT vào sự cố Camera sẵn có (nếu xảy ra trong vòng 5s)
+     * Dung hợp sự cố IoT vào sự cố Camera sẵn có CỦA CÙNG TÀI KHOẢN (nếu xảy ra trong vòng 5s)
      */
     public FallIncident fuseIotEvent(IotDevice device, MonitoredSubject patient, IotEventRequest request) {
-        LocalDateTime thresholdTime = LocalDateTime.now().minusSeconds(5);
-        Optional<FallIncident> recentIncidentOpt = incidentRepository
-                .findFirstByIncidentTimeAfterAndStatusOrderByIncidentTimeDesc(thresholdTime, FallIncident.IncidentStatus.PENDING);
+        Long accountId = (patient != null && patient.getAccount() != null)
+                ? patient.getAccount().getId()
+                : null;
+
+        Optional<FallIncident> recentIncidentOpt = findRecentPendingIncident(accountId);
 
         if (recentIncidentOpt.isPresent()) {
             FallIncident incident = recentIncidentOpt.get();
@@ -77,6 +82,16 @@ public class IncidentFusionService {
                 .build();
     }
 
+    // Chỉ tìm sự cố PENDING trong 5s gần nhất của đúng tài khoản; không rõ chủ thì không gộp
+    private Optional<FallIncident> findRecentPendingIncident(Long accountId) {
+        if (accountId == null) return Optional.empty();
+        return incidentRepository.findRecentByOwnerAccountIdAndStatus(
+                        accountId,
+                        LocalDateTime.now().minusSeconds(5),
+                        FallIncident.IncidentStatus.PENDING,
+                        PageRequest.of(0, 1))
+                .stream().findFirst();
+    }
     /**
      * Soạn thảo văn bản thông báo gộp linh hoạt theo nguồn dữ liệu
      */

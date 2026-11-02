@@ -1,8 +1,8 @@
 package com.backend.SentinelCare.service;
-
 import com.backend.SentinelCare.model.EmergencyContact;
 import com.backend.SentinelCare.model.FallIncident;
 import com.backend.SentinelCare.repository.FallIncidentRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import okhttp3.*;
@@ -11,11 +11,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -57,13 +59,13 @@ public class VoipCallService {
             // Kiểm tra trạng thái sự cố trước khi BẮT ĐẦU cuộc gọi mới
             Optional<FallIncident> currentIncidentOpt = incidentRepository.findById(incidentId);
             if (currentIncidentOpt.isPresent() && currentIncidentOpt.get().getStatus() == FallIncident.IncidentStatus.ACKNOWLEDGED) {
-                log.info("🛑 Sự cố ID {} đã được ACKNOWLEDGED. Không chuyển sang gọi người ưu tiên tiếp theo nữa.", incidentId);
+                log.info(" Sự cố ID {} đã được ACKNOWLEDGED. Không chuyển sang gọi người ưu tiên tiếp theo nữa.", incidentId);
                 updateCallStatus(incidentId, FallIncident.CallEscalationStatus.ESCALATION_STOPPED);
                 break;
             }
 
             String phoneNumber = contact.getPhoneNumber();
-            log.info("📞 [CALLING] [Priority {}] Đang gọi tới: {} ({})",
+            log.info(" [CALLING] [Priority {}] Đang gọi tới: {} ({})",
                     contact.getPriorityOrder(), contact.getContactName(), phoneNumber);
 
             // Cập nhật trạng thái cuộc gọi sang CALLING
@@ -75,7 +77,7 @@ public class VoipCallService {
             if (callSuccess) {
                 // Đã bắt máy / kết nối cuộc gọi thành công
                 updateCallStatus(incidentId, FallIncident.CallEscalationStatus.CALL_CONNECTED);
-                log.info("✅ [CALL_CONNECTED] Cuộc gọi tới người thân {} đã kết nối và phát xong thông báo!", contact.getContactName());
+                log.info(" [CALL_CONNECTED] Cuộc gọi tới người thân {} đã kết nối và phát xong thông báo!", contact.getContactName());
                 
                 // Sau khi cuộc gọi hiện tại hoàn tất thành công, dừng xoay vòng gọi tiếp
                 break; 
@@ -104,10 +106,9 @@ public class VoipCallService {
     private boolean makeRealGsmCall(String toPhoneNumber, String textToRead) {
         try {
             if (stringeeFromNumber == null || stringeeFromNumber.isBlank()) {
-                log.warn("⚠️️ [VOIP SIMULATE] Chưa cấu hình stringee.from.number. Giả lập gọi thành công!");
-                return true; 
+                log.error(" [VOIP] Chua cau hing stringee.from.number nen khong the goi dien. bo qua cuoc goi toi {}.", toPhoneNumber);
+                return false;
             }
-
             String formattedPhone = toPhoneNumber.trim();
             if (formattedPhone.startsWith("0")) {
                 formattedPhone = "84" + formattedPhone.substring(1);
@@ -115,25 +116,17 @@ public class VoipCallService {
 
             String jwtToken = generateStringeeJwtToken();
 
-            String jsonPayload = String.format("""
-                {
-                  "from": { "type": "external", "number": "%s", "alias": "%s" },
-                  "to": [ { "type": "external", "number": "%s", "alias": "%s" } ],
-                  "actions": [
-                    {
-                      "action": "talk",
-                      "text": "%s",
-                      "voice": "vi",
-                      "speed": 0,
-                      "loop": 2
-                    }
-                  ]
-                }
-                """, 
-                stringeeFromNumber, stringeeFromNumber,
-                formattedPhone, formattedPhone,
-                textToRead.replace("\"", "\\\"")
+                        Map<String, Object> payload = Map.of(
+                    "from", Map.of("type", "external", "number", stringeeFromNumber, "alias", stringeeFromNumber),
+                    "to", List.of(Map.of("type", "external", "number", formattedPhone, "alias", formattedPhone)),
+                    "actions", List.of(Map.of(
+                            "action", "talk",
+                            "text", textToRead,
+                            "voice", "vi",
+                            "speed", 0,
+                            "loop", 2))
             );
+            String jsonPayload = new ObjectMapper().writeValueAsString(payload);
 
             RequestBody body = RequestBody.create(jsonPayload, MediaType.parse("application/json"));
             Request request = new Request.Builder()

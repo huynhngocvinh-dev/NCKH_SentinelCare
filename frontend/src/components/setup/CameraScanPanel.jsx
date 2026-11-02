@@ -8,7 +8,6 @@ export default function CameraScanPanel({ onApplySerial }) {
   const [identifyMethod, setIdentifyMethod] = useState("qr"); // 'qr' | 'manual'
   const [manualSerialInput, setManualSerialInput] = useState("");
   const [isScanningWebcam, setIsScanningWebcam] = useState(false);
-  const [isSimulatingScan, setIsSimulatingScan] = useState(false);
   const html5QrCodeRef = useRef(null);
 
   // Tự động tắt luồng Webcam khi unmount hoặc chuyển tab
@@ -97,29 +96,6 @@ export default function CameraScanPanel({ onApplySerial }) {
     } else {
       setIsScanningWebcam(false);
     }
-  };
-
-  // Giả lập quét QR (Dev mode test nhanh)
-  const handleSimulateQRScan = () => {
-    setIsSimulatingScan(true);
-    toast.info("Đang thử nghiệm quét QR...");
-
-    setTimeout(() => {
-      const simulatedRawCode = `CAM-AI-${Math.floor(
-        10000 + Math.random() * 90000
-      )}-VN`;
-
-      const checkResult = validateCameraQrCode(simulatedRawCode);
-      if (checkResult.valid) {
-        onApplySerial(checkResult.serial);
-        toast.success(
-          `Đã quét QR thành công! Mã Serial: ${checkResult.serial}`
-        );
-      } else {
-        toast.error(checkResult.message);
-      }
-      setIsSimulatingScan(false);
-    }, 1200);
   };
 
   // Áp dụng mã khi nhập thủ công
@@ -217,15 +193,6 @@ export default function CameraScanPanel({ onApplySerial }) {
                 Tắt Webcam
               </button>
             )}
-
-            <button
-              type="button"
-              onClick={handleSimulateQRScan}
-              disabled={isSimulatingScan || isScanningWebcam}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-700 transition-all cursor-pointer disabled:opacity-50"
-            >
-              Quét giả lập
-            </button>
           </div>
         </div>
       )}

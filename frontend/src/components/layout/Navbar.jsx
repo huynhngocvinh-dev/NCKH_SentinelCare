@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   FiShield,
   FiActivity,
@@ -12,10 +12,13 @@ import {
   FiLogOut,
   FiBell,
   FiAlertTriangle,
+  FiCreditCard,
 } from "react-icons/fi";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useIncidentWebSocket } from "../../hooks/useIncidentWebSocket";
+import AccountCard, { Avatar } from "../AccountCard";
+import { useSubscription } from "../../hooks/useSubscription";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -29,6 +32,25 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const { subscription } = useSubscription();
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const accountMenuRef = useRef(null);
+
+  // Bấm ra ngoài menu tài khoản thì đóng
+  useEffect(() => {
+    if (!showAccountMenu) return;
+    const onClickOutside = (e) => {
+      if (
+        accountMenuRef.current &&
+        !accountMenuRef.current.contains(e.target)
+      ) {
+        setShowAccountMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [showAccountMenu]);
 
   // Lắng nghe WebSocket: Lưu vào danh sách thông báo của Chuông khi có sự cố
   useIncidentWebSocket((newIncident) => {
@@ -142,6 +164,17 @@ export default function Navbar() {
               >
                 <FiClock className="w-4 h-4" />
                 <span>Lịch sử</span>
+              </button>
+              <button
+                onClick={() => navigate("/goi-cua-toi")}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer ${
+                  isActive("/goi-cua-toi") || isActive("/bang-gia")
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <FiCreditCard className="w-4 h-4" />
+                <span>Dịch Vụ</span>
               </button>
             </nav>
           )}
@@ -264,23 +297,54 @@ export default function Navbar() {
                 </div>
               )}
 
-              {/* Nút Quản lý tài khoản */}
-              <button
-                onClick={() => navigate("/tai-khoan")}
-                title="Quản lý tài khoản cá nhân"
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 border border-slate-200 transition-all cursor-pointer shadow-sm"
-              >
-                <FiUser className="w-5 h-5" />
-              </button>
+              {/* Tài khoản: ảnh đại diện + menu */}
+              <div className="relative" ref={accountMenuRef}>
+                <button
+                  onClick={() => setShowAccountMenu((v) => !v)}
+                  title="Tài khoản"
+                  className="cursor-pointer rounded-full focus:outline-none focus:ring-2 focus:ring-blue-300"
+                >
+                  <Avatar name={user?.fullName} email={user?.email} size="sm" />
+                </button>
 
-              {/* Nút Đăng xuất */}
-              <button
-                onClick={logout}
-                title="Đăng xuất"
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-all cursor-pointer"
-              >
-                <FiLogOut className="w-4 h-4" />
-              </button>
+                {showAccountMenu && (
+                  <div className="absolute right-0 top-12 z-50 w-80 rounded-2xl border border-slate-100 bg-white p-2 shadow-2xl">
+                    <div className="p-3">
+                      <AccountCard user={user} subscription={subscription} />
+                    </div>
+                    <div className="border-t border-slate-100 pt-1">
+                      <button
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          navigate("/tai-khoan");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <FiUser className="h-4 w-4" /> Quản lý tài khoản
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          navigate("/goi-cua-toi");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <FiCreditCard className="h-4 w-4" /> Gói dịch vụ & thanh
+                        toán
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowAccountMenu(false);
+                          logout();
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50"
+                      >
+                        <FiLogOut className="h-4 w-4" /> Đăng xuất
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
             <>

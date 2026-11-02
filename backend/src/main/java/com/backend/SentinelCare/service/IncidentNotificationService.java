@@ -29,6 +29,7 @@ public class IncidentNotificationService {
     private final SubscriptionService subscriptionService;
     private final EmergencyContactRepository contactRepository;
     private final FallIncidentRepository incidentRepository;
+    private final IncidentTimerService timerService;
 
     /**
      * Bắn thông báo tức thì lên WebApp và gửi Email kèm Audio TTS cho đúng danh sách người thân
@@ -40,7 +41,7 @@ public class IncidentNotificationService {
         wsData.put("status", incident.getStatus() != null ? incident.getStatus().name() : "PENDING");
         wsData.put("callEscalationStatus", incident.getCallEscalationStatus() != null ? incident.getCallEscalationStatus().name() : "CALL_NOT_STARTED");
         wsData.put("snapshotUrl", incident.getSnapshotUrl() != null ? incident.getSnapshotUrl() : "");
-        wsData.put("confidenceScore", incident.getConfidenceScore() != null ? incident.getConfidenceScore() : 0.95);
+        wsData.put("confidenceScore", incident.getConfidenceScore());
         wsData.put("incidentTime", incident.getIncidentTime() != null ? incident.getIncidentTime().toString() : "");
 
         // Tên bệnh nhân (dành cho IoT Band hoặc Camera có định danh)
@@ -69,13 +70,18 @@ public class IncidentNotificationService {
         }
         wsData.put("source", source);
 
-        // Bắn dữ liệu xuống WebApp qua WebSocket
-        messagingTemplate.convertAndSend("/topic/incidents", wsData);
-        log.info("[WEBSOCKET] da gui thong bao su co len ID {} len WebApp", incident.getId());
-
+        
         // Lấy Account và danh sách EmergencyContact
         Account account = extractAccountFromIncident(incident);
         Long accountId = account != null ? account.getId() : null;
+
+        // Bắn dữ liệu xuống WebApp CHỈ cho chủ tài khoản (kênh riêng /user/queue/incidents)
+        if (account != null) {
+            messagingTemplate.convertAndSendToUser(account.getEmail(), "/queue/incidents", wsData);
+            log.info("[WEBSOCKET] da gui thong bao su co ID {} cho tai khoan ID {}", incident.getId(), account.getId());
+        } else {
+            log.warn("[WEBSOCKET] su co ID {} khong xac dinh duoc tai khoan chu, khong gui len WebApp.", incident.getId());
+        }
 
         List<EmergencyContact> contacts = loadContacts(accountId);
 
@@ -90,47 +96,40 @@ public class IncidentNotificationService {
         trigger5sCallEscalationTimer(incident.getId(), alertText);
     }
 
-    /**
-     * Đếm ngược 5s kích hoạt Cuộc gọi GSM (Chỉ gọi nếu gói hỗ trợ CALL_ALERT và chưa bấm ACKNOWLEDGED)
+        /**
+     * Đếm ngược 5s rồi mới kích hoạt cuộc gọi GSM (không chặn luồng gọi)
      */
-    @Async
-    public void trigger5sCallEscalationTimer(Long incidentId, String alertText) {
-        try {
+        private void trigger5sCallEscalationTimer(Long incidentId, String alertText) {
             log.info(" [TIMER 5S] bat dau dem nguoc 5s don bay kich hoat cuoc goi cho su co ID {}", incidentId);
-            Thread.sleep(5000); // Đếm ngược 5 giây
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return;
+            timerService.runAfter(5, "CALL-5s-" + incidentId, () -> handleCallEscalation(incidentId, alertText));
         }
-
-        Optional<FallIncident> incidentOpt = incidentRepository.findById(incidentId);
-        if (incidentOpt.isPresent()) {
-            FallIncident incident = incidentOpt.get();
-
-            // Kiểm tra trạng thái sự cố: Nếu chưa ACKNOWLEDGED và chưa bị CANCELLED_BY_USER
-            if (incident.getStatus() != FallIncident.IncidentStatus.ACKNOWLEDGED
-                    && incident.getStatus() != FallIncident.IncidentStatus.CANCELLED_BY_USER) {
-
-                Account account = extractAccountFromIncident(incident);
-                Long accountId = account != null ? account.getId() : null;
-
-                // Kiểm tra gói dịch vụ có tính năng gọi GSM (CALL_ALERT) hay không
-                if (accountId != null && subscriptionService.hasFeatureAccess(accountId, "CALL_ALERT")) {
-                    log.warn(" [TIMEOUT 5S] lap tuc kich hoat cuoc goi xoay vong qua Stringee!");
-
-                    List<EmergencyContact> contacts = loadContacts(accountId);
-
-                    voipCallService.triggerEscalationCallWorkflow(incident.getId(), contacts, alertText);
-                } else {
-                    updateCallStatus(incidentId, FallIncident.CallEscalationStatus.CALL_NOT_STARTED);
-                    log.info("[TIMEOUT 5S] het 5s nhung tai khoan ID {} su dung goi FREEMIUM (khong ho tro cuoc goi GSM).", accountId);
-                }
-            } else {
-                updateCallStatus(incidentId, FallIncident.CallEscalationStatus.ESCALATION_STOPPED);
+    
+        private void handleCallEscalation(Long incidentId, String alertText) {
+            FallIncident incident = incidentRepository.findById(incidentId).orElse(null);
+            if (incident == null) return;
+    
+            // Đã xác nhận hoặc đã hủy trong 5s -> không gọi điện
+            if (incident.getStatus() == FallIncident.IncidentStatus.ACKNOWLEDGED
+                    || incident.getStatus() == FallIncident.IncidentStatus.CANCELLED_BY_USER) {
+                incident.setCallEscalationStatus(FallIncident.CallEscalationStatus.ESCALATION_STOPPED);
+                incidentRepository.save(incident);
                 log.info(" [DISARMED] su co ID {} da duoc xac nhan/huy trong vong 5s. huy cuoc goi GSM!", incidentId);
+                return;
+            }
+    
+            Account account = extractAccountFromIncident(incident);
+            Long accountId = account != null ? account.getId() : null;
+    
+            if (accountId != null && subscriptionService.hasFeatureAccess(accountId, "CALL_ALERT")) {
+                log.warn(" [TIMEOUT 5S] lap tuc kich hoat cuoc goi xoay vong qua Stringee!");
+                voipCallService.triggerEscalationCallWorkflow(
+                        incident.getId(), loadContacts(accountId), alertText);
+            } else {
+                incident.setCallEscalationStatus(FallIncident.CallEscalationStatus.CALL_NOT_STARTED);
+                incidentRepository.save(incident);
+                log.info("[TIMEOUT 5S] tai khoan ID {} khong ho tro cuoc goi GSM hoac khong xac dinh duoc chu.", accountId);
             }
         }
-    }
 
     private void sendEmailWithAiVoice(List<EmergencyContact> contacts, String alertText, Long incidentId) {
         try {
@@ -146,12 +145,6 @@ public class IncidentNotificationService {
         }
     }
 
-    private void updateCallStatus(Long incidentId, FallIncident.CallEscalationStatus status) {
-        incidentRepository.findById(incidentId).ifPresent(inc -> {
-            inc.setCallEscalationStatus(status);
-            incidentRepository.save(inc);
-        });
-    }
 
     private Account extractAccountFromIncident(FallIncident incident) {
         // 1. Luồng IoT Device: Lấy Account chính chủ qua MonitoredSubject (Patient)

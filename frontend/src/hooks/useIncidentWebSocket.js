@@ -1,51 +1,43 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
+import { useAuth } from "../context/AuthContext.jsx";
+
+const WS_URL =
+  import.meta.env.VITE_WS_URL || "http://localhost:8080/ws-sentinel";
 
 export const useIncidentWebSocket = (onIncidentReceived) => {
+  const { isAuthenticated } = useAuth();
+
+  // Giữ callback mới nhất mà không làm kết nối bị tạo lại mỗi lần render
+  const handlerRef = useRef(onIncidentReceived);
   useEffect(() => {
-    // 1. Lấy token để xác nhận đã đăng nhập
-    let token = localStorage.getItem("fg_access_token");
-    if (!token) {
-      try {
-        const fgUser = JSON.parse(localStorage.getItem("fg_user") || "{}");
-        token = fgUser.token || fgUser.accessToken;
-      } catch (e) {
-        token = null;
-      }
-    }
+    handlerRef.current = onIncidentReceived;
+  }, [onIncidentReceived]);
 
-    // Nếu chưa đăng nhập thì không kết nối WebSocket
-    if (!token) {
-      return;
-    }
+  useEffect(() => {
+    // Chưa đăng nhập thì không kết nối
+    if (!isAuthenticated) return;
 
-    // 2. Khởi tạo SockJS kết nối về Backend Spring Boot
+    // Trình duyệt tự gửi HttpOnly Cookie khi bắt tay WebSocket
     const client = new Client({
-      webSocketFactory: () => new SockJS("http://localhost:8080/ws-sentinel"),
-      connectHeaders: {
-        Authorization: `Bearer ${token}`,
-      },
-      reconnectDelay: 5000, // Tự kết nối lại sau 5s nếu rớt mạng
+      webSocketFactory: () => new SockJS(WS_URL),
+      reconnectDelay: 5000,
     });
 
     client.onConnect = () => {
-      // 3. Đăng ký lắng nghe kênh thông báo sự cố
-      client.subscribe("/topic/incidents", (message) => {
+      // Kênh riêng của tài khoản đang đăng nhập
+      client.subscribe("/user/queue/incidents", (message) => {
         if (message.body) {
-          const incidentData = JSON.parse(message.body);
-          if (onIncidentReceived) {
-            onIncidentReceived(incidentData);
-          }
+          handlerRef.current?.(JSON.parse(message.body));
         }
       });
     };
 
     client.activate();
 
-    // Cleanup khi component unmount
     return () => {
       client.deactivate();
     };
-  }, [onIncidentReceived]);
+  }, [isAuthenticated]);
 };

@@ -10,6 +10,13 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+
+import org.springframework.web.util.HtmlUtils;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
@@ -20,6 +27,10 @@ public class EmailService {
 
     @org.springframework.beans.factory.annotation.Value("${app.public-base-url}")
     private String publicBaseUrl;
+    @org.springframework.beans.factory.annotation.Value("${app.frontend-base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
+
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     @Async
     public void sendOtpEmail(String toEmail, String otpCode) {
@@ -105,5 +116,101 @@ public class EmailService {
         } catch (Exception e) {
             log.error("loi khi gui canh bao toi  {}: ", toEmail, e);
         }
+    }
+
+    // ===================== EMAIL GÓI DỊCH VỤ =====================
+
+    @Async
+    public void sendRenewalReminderEmail(String toEmail, String fullName, String currentPackage,
+                                            String nextPackage, BigDecimal amount, LocalDateTime expiredAt,
+                                            boolean willRenew) {
+        String date = expiredAt.format(DATE_FMT);
+        if (willRenew) {
+            sendSubscriptionMail(toEmail,
+                    "[SentinelCare] Gói dịch vụ sẽ tự động gia hạn vào " + date,
+                    "Sắp đến kỳ gia hạn", fullName,
+                    "Gói <strong>" + HtmlUtils.htmlEscape(currentPackage) + "</strong> của bạn sẽ được tự động gia hạn vào <strong>"
+                            + date + "</strong>. Chúng tôi sẽ trừ <strong>" + formatMoney(amount) + "</strong> cho gói <strong>"
+                            + HtmlUtils.htmlEscape(nextPackage) + "</strong>.<br/><br/>Nếu không muốn gia hạn, bạn có thể tắt tự động gia hạn trước ngày này.",
+                    "Quản lý gói dịch vụ");
+        } else {
+            sendSubscriptionMail(toEmail,
+                    "[SentinelCare] Gói dịch vụ sắp hết hạn vào " + date,
+                    "Gói dịch vụ sắp hết hạn", fullName,
+                    "Gói <strong>" + HtmlUtils.htmlEscape(currentPackage) + "</strong> của bạn sẽ hết hạn vào <strong>" + date
+                            + "</strong> và tài khoản sẽ chuyển về gói Miễn phí (mất các quyền lợi cảnh báo nâng cao).<br/><br/>"
+                            + "Hãy bật tự động gia hạn hoặc mua lại gói để không bị gián đoạn bảo vệ.",
+                    "Gia hạn ngay");
+        }
+    }
+
+    @Async
+    public void sendRenewalSuccessEmail(String toEmail, String fullName, String packageName,
+                                        BigDecimal amount, LocalDateTime newExpiredAt) {
+        sendSubscriptionMail(toEmail,
+                "[SentinelCare] Gia hạn gói dịch vụ thành công",
+                "Gia hạn thành công", fullName,
+                "Chúng tôi đã trừ <strong>" + formatMoney(amount) + "</strong> để gia hạn gói <strong>"
+                        + HtmlUtils.htmlEscape(packageName) + "</strong>. Gói có hiệu lực đến <strong>"
+                        + (newExpiredAt != null ? newExpiredAt.format(DATE_FMT) : "không thời hạn") + "</strong>.",
+                "Xem chi tiết gói");
+    }
+
+    @Async
+    public void sendPaymentFailedEmail(String toEmail, String fullName, String packageName,
+                                        BigDecimal amount, String reason, LocalDateTime graceUntil) {
+        sendSubscriptionMail(toEmail,
+                "[SentinelCare] Thanh toán gia hạn không thành công",
+                "Thanh toán không thành công", fullName,
+                "Chúng tôi không thể trừ <strong>" + formatMoney(amount) + "</strong> để gia hạn gói <strong>"
+                        + HtmlUtils.htmlEscape(packageName) + "</strong>.<br/>Nguyên nhân: <strong>"
+                        + HtmlUtils.htmlEscape(reason == null ? "Không xác định" : reason) + "</strong>.<br/><br/>"
+                        + "Bạn vẫn được giữ nguyên quyền lợi đến hết <strong>" + graceUntil.format(DATE_FMT)
+                        + "</strong>. Hệ thống sẽ thử thu tiền lại mỗi ngày, hoặc bạn có thể thanh toán ngay để tránh bị hạ về gói Miễn phí.",
+                "Thanh toán ngay");
+    }
+
+    @Async
+    public void sendSubscriptionExpiredEmail(String toEmail, String fullName, String packageName) {
+        sendSubscriptionMail(toEmail,
+                "[SentinelCare] Gói dịch vụ đã hết hạn",
+                "Gói dịch vụ đã hết hạn", fullName,
+                "Gói <strong>" + HtmlUtils.htmlEscape(packageName) + "</strong> của bạn đã hết hạn và tài khoản đã chuyển về gói Miễn phí.<br/><br/>"
+                        + "Bạn có thể mua lại gói bất cứ lúc nào để khôi phục đầy đủ quyền lợi.",
+                "Xem bảng giá");
+    }
+
+    private void sendSubscriptionMail(String toEmail, String subject, String heading,
+                                        String fullName, String bodyHtml, String ctaText) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+
+            String html = String.format("""
+                <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f8;">
+                    <div style="max-width: 520px; margin: 0 auto; background: #ffffff; padding: 30px; border-radius: 12px;">
+                    <h2 style="color: #2563eb; margin-top: 0;">%s</h2>
+                    <p style="font-size: 14px; color: #334155;">Xin chào <strong>%s</strong>,</p>
+                    <div style="font-size: 14px; color: #334155; line-height: 1.6;">%s</div>
+                    <p style="text-align: center; margin: 28px 0 8px;">
+                        <a href="%s" style="background: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">%s</a>
+                    </p>
+                    <p style="font-size: 12px; color: #64748b; text-align: center;">Bạn có thể tắt tự động gia hạn bất cứ lúc nào trong mục Gói của tôi.</p>
+                    </div>
+                </div>
+                """, heading, HtmlUtils.htmlEscape(fullName), bodyHtml, frontendBaseUrl + "/goi-cua-toi", ctaText);
+
+            helper.setText(html, true);
+            mailSender.send(message);
+            log.info("[EMAIL SENT] email gói dịch vụ '{}' tới {}", heading, toEmail);
+        } catch (MessagingException e) {
+            log.error("loi khi gui email goi dich vu toi {}: ", toEmail, e);
+        }
+    }
+
+    private String formatMoney(BigDecimal amount) {
+        return String.format("%,d", amount.longValue()).replace(',', '.') + "đ";
     }
 }

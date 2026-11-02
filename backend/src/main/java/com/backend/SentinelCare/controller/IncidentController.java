@@ -177,6 +177,7 @@ public class IncidentController {
                     .patientName(inc.getPatient() != null ? inc.getPatient().getFullName() : "Chưa định danh (Camera AI)")
                     .locationAddress(location)
                     .status(inc.getStatus().name())
+                    .callEscalationStatus(inc.getCallEscalationStatus() != null ? inc.getCallEscalationStatus().name() : null)
                     .snapshotUrl(inc.getSnapshotUrl())
                     .build();
         }).toList();

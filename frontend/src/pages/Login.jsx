@@ -29,7 +29,7 @@ export default function Login() {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
-  const redirectTo = location.state?.from?.pathname || "/dashboard";
+  const redirectTo = location.state?.from?.pathname || "/";
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;
@@ -51,8 +51,9 @@ export default function Login() {
       const { data } = await authApi.login({
         email: values.identifier.trim(),
         password: values.password,
+        remember: values.remember,
       });
-      login(data.token, data);
+      login(data);
       toast.success(`Chào mừng trở lại, ${data.fullName || "Bạn"}!`);
       navigate(redirectTo, { replace: true });
     } catch (err) {

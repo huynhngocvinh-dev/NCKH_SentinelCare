@@ -30,4 +30,13 @@ public class GlobalExceptionHandler {
         response.put("errors", errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
+
+    // Lỗi nghiệp vụ (thanh toán, trạng thái gói...): trả đúng mã HTTP + mã lỗi + nguyên nhân cụ thể
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<?> handleBusiness(BusinessException ex) {
+        Map<String, String> response = new HashMap<>();
+        response.put("message", ex.getMessage());
+        response.put("code", ex.getCode());
+        return ResponseEntity.status(ex.getStatus()).body(response);
+    }
 }

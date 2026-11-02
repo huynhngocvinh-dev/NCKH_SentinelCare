@@ -23,41 +23,45 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private JwtTokenProvider tokenProvider;
 
+    @Autowired
+    private AuthCookieService authCookieService;
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
 
         return path.equals("/api/auth/login")
-            || path.equals("/api/auth/register")
-            || path.equals("/api/auth/verify-otp")
-            || path.equals("/api/auth/resend-otp")
-            || path.equals("/api/incidents/webhook/camera")
-            || path.equals("/api/incidents/iot-event")
-            || path.startsWith("/ws-sentinel");
+                || path.equals("/api/auth/register")
+                || path.equals("/api/auth/verify-otp")
+                || path.equals("/api/auth/resend-otp")
+                || path.equals("/api/auth/otp-status")
+                || path.equals("/api/auth/logout")
+                || path.equals("/api/incidents/webhook/camera")
+                || path.equals("/api/incidents/iot-event")
+                || path.equals("/api/v1/payments/momo/ipn")
+                || path.equals("/api/v1/payments/momo/unbind");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         try {
-            String jwt = getJwtFromRequest(request);
+            // JWT nằm trong HttpOnly Cookie, JavaScript không đọc được
+            String jwt = authCookieService.resolveToken(request);
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
                 String username = tokenProvider.getUsernameFromJWT(jwt);
-                String role = tokenProvider.getRoleFromJWT(jwt); 
+                String role = tokenProvider.getRoleFromJWT(jwt);
 
-                // 2. Chuyển Role thành Authority hợp lệ của Spring Security (VD: ROLE_CAREGIVER)
                 List<SimpleGrantedAuthority> authorities = Collections.emptyList();
                 if (StringUtils.hasText(role)) {
                     authorities = Collections.singletonList(
-                        new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())
-                    );
+                            new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
                 }
 
-                // . Nạp đầy đủ Username + Role vào SecurityContext
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         username, null, authorities);
-                
+
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
@@ -66,13 +70,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    private String getJwtFromRequest(HttpServletRequest request) {
-        String bearerToken = request.getHeader("Authorization");
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
-            return bearerToken.substring(7);
-        }
-        return null;
     }
 }

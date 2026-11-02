@@ -87,8 +87,9 @@ public class DeviceService {
         IotDevice device = new IotDevice();
         device.setDeviceSerial(request.getSerialNumber());
         device.setMonitoredSubject(savedSubject);
-        device.setConnectionStatus(IotDevice.ConnectionStatus.online);
-        device.setBatteryLevel(100);
+        // Chưa có tín hiệu nào từ thiết bị: pin chưa biết, offline cho đến khi thiết bị gửi tín hiệu đầu tiên
+        device.setConnectionStatus(IotDevice.ConnectionStatus.offline);
+        device.setBatteryLevel(null);
 
         // Lưu bảng iot_devices
         iotDeviceRepository.save(device);

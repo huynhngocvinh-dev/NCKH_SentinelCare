@@ -19,11 +19,6 @@ public interface FallIncidentRepository extends JpaRepository<FallIncident, Long
     // Tìm sự cố đang đếm ngược 25s của người bệnh
     Optional<FallIncident> findFirstByPatientIdAndStatusOrderByIncidentTimeDesc(
             Long patientId, FallIncident.IncidentStatus status);
-
-    // Tìm sự cố gần nhất theo mốc thời gian & trạng thái để gộp báo động
-    Optional<FallIncident> findFirstByIncidentTimeAfterAndStatusOrderByIncidentTimeDesc(
-            LocalDateTime incidentTime, FallIncident.IncidentStatus status);
-
     // Lịch sử sự cố của 1 tài khoản (có phân trang)
     @Query("SELECT i FROM FallIncident i " +
            "LEFT JOIN i.patient p " +
@@ -32,6 +27,21 @@ public interface FallIncidentRepository extends JpaRepository<FallIncident, Long
            "WHERE p.account.id = :accountId OR a.account.id = :accountId")
     Page<FallIncident> findByOwnerAccountId(@Param("accountId") Long accountId, Pageable pageable);
 
+        // Sự cố gần nhất CỦA ĐÚNG TÀI KHOẢN theo mốc thời gian & trạng thái, dùng để gộp báo động
+    @Query("SELECT i FROM FallIncident i " +
+           "LEFT JOIN i.patient p " +
+           "LEFT JOIN i.cameraDevice c " +
+           "LEFT JOIN c.address a " +
+           "WHERE i.status = :status AND i.incidentTime > :after " +
+           "AND (p.account.id = :accountId OR a.account.id = :accountId) " +
+           "ORDER BY i.incidentTime DESC")
+    List<FallIncident> findRecentByOwnerAccountIdAndStatus(
+            @Param("accountId") Long accountId,
+            @Param("after") LocalDateTime after,
+            @Param("status") FallIncident.IncidentStatus status,
+            Pageable pageable);
+
+            
     // Sự cố có thuộc tài khoản này không (kiểm tra quyền trước khi xác nhận)
     @Query("SELECT COUNT(i) > 0 FROM FallIncident i " +
            "LEFT JOIN i.patient p " +

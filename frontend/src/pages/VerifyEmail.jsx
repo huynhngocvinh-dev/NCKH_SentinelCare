@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiShield, FiLock, FiMail, FiCheckCircle } from "react-icons/fi";
 import AuthShell from "../components/AuthShell.jsx";
 import { authApi } from "../services/api.js";
-import { useAuth } from "../context/AuthContext.jsx";
 
 const OTP_LENGTH = 6;
-const RESEND_SECONDS = 60;
 
 function maskEmail(emailStr = "") {
   const [name, domain] = emailStr.split("@");
@@ -19,24 +17,65 @@ function maskEmail(emailStr = "") {
 export default function VerifyEmail() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { login } = useAuth();
 
-  // Tự động lấy email từ state hoặc dùng fallback email cho việc Test UI
-  const email = location.state?.email || "nguyenvanan@carehub.com";
+  // Email lấy từ trang đăng ký (vẫn còn sau khi F5 vì nằm trong history state).
+  // Không có email -> quay lại trang đăng ký.
+  const email = location.state?.email || "";
 
   const [digits, setDigits] = useState(Array(OTP_LENGTH).fill(""));
   const [submitting, setSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
+  const [secondsLeft, setSecondsLeft] = useState(null); // null = đang đồng bộ với máy chủ
+  const [deadline, setDeadline] = useState(null);
   const inputsRef = useRef([]);
 
   const otp = useMemo(() => digits.join(""), [digits]);
 
+  // Đồng bộ thời gian chờ gửi lại với máy chủ (Redis) -> F5 không làm đếm lại từ đầu
+  const syncCooldown = useCallback(async () => {
+    try {
+      const { data } = await authApi.otpStatus(email);
+      if (!data.pending) {
+        toast.error("Yêu cầu đăng ký đã hết hạn. Vui lòng đăng ký lại!", {
+          toastId: "otp-expired",
+        });
+        navigate("/dang-ky", { replace: true });
+        return;
+      }
+      setDeadline(Date.now() + data.cooldownSeconds * 1000);
+      setSecondsLeft(data.cooldownSeconds);
+    } catch {
+      // Không lấy được trạng thái: cho phép bấm gửi lại, máy chủ vẫn kiểm tra thời gian chờ
+      setDeadline(null);
+      setSecondsLeft(0);
+    }
+  }, [email, navigate]);
+
   useEffect(() => {
-    if (secondsLeft <= 0) return;
-    const timer = setInterval(() => setSecondsLeft((s) => s - 1), 1000);
+    if (!email) {
+      navigate("/dang-ky", { replace: true });
+      return;
+    }
+    syncCooldown();
+  }, [email, navigate, syncCooldown]);
+
+  // Đếm ngược theo mốc thời gian (không bị lệch khi tab bị trình duyệt làm chậm)
+  useEffect(() => {
+    if (deadline === null) return;
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      return remaining;
+    };
+
+    tick();
+    const timer = setInterval(() => {
+      if (tick() <= 0) clearInterval(timer);
+    }, 1000);
+
     return () => clearInterval(timer);
-  }, [secondsLeft]);
+  }, [deadline]);
 
   function handleDigitChange(index, rawValue) {
     const value = rawValue.replace(/\D/g, "");
@@ -76,12 +115,9 @@ export default function VerifyEmail() {
 
     setSubmitting(true);
     try {
-      if (authApi?.verifyOtp) {
-        const { data } = await authApi.verifyOtp({ email, otp });
-        login(data.accessToken, data.user);
-      }
-      toast.success("Xác thực email thành công!");
-      navigate("/dashboard", { replace: true });
+      await authApi.verifyOtp({ email, otp });
+      toast.success("Xác thực email thành công! Vui lòng đăng nhập.");
+      navigate("/dang-nhap", { replace: true });
     } catch (err) {
       const message =
         err.response?.data?.message ||
@@ -96,19 +132,20 @@ export default function VerifyEmail() {
   async function handleResend() {
     setResending(true);
     try {
-      if (authApi?.resendOtp) {
-        await authApi.resendOtp({ email });
-      }
-      toast.success("Đã gửi lại mã OTP tới email của bạn.");
-      setSecondsLeft(RESEND_SECONDS);
+      await authApi.resendOtp({ email });
+      toast.success(
+        "Đã gửi mã OTP mới tới email của bạn. Mã cũ không còn hiệu lực."
+      );
       setDigits(Array(OTP_LENGTH).fill(""));
       inputsRef.current[0]?.focus();
+      await syncCooldown(); // bắt đầu lại 60s theo đồng hồ của máy chủ
     } catch (err) {
       toast.error(
         err.response?.data?.message ||
           err.message ||
           "Không thể gửi lại mã OTP."
       );
+      await syncCooldown(); // đồng bộ lại nếu máy chủ báo chưa hết thời gian chờ
     } finally {
       setResending(false);
     }
@@ -228,7 +265,11 @@ export default function VerifyEmail() {
         </button>
 
         <div className="text-center text-xs text-slate-500 space-y-2">
-          {secondsLeft > 0 ? (
+          {secondsLeft === null ? (
+            <span className="text-slate-400">
+              Đang đồng bộ thời gian chờ...
+            </span>
+          ) : secondsLeft > 0 ? (
             <span>
               Gửi lại mã sau{" "}
               <strong className="font-mono text-blue-600">

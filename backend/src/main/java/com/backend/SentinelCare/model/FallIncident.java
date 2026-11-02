@@ -40,7 +40,7 @@ public class FallIncident {
     @Column(name = "confidence_score")
     private Float confidenceScore;
 
-    @Column(name = "snapshot_url", length = 550)
+    @Column(name = "snapshot_url", columnDefinition = "MEDIUMTEXT")
     private String snapshotUrl;
 
     // 1. Trạng thái vòng đời sự cố

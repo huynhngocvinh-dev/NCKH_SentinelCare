@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useCallback,
 } from "react";
@@ -9,84 +10,45 @@ import { authApi } from "../services/api.js";
 
 const AuthContext = createContext(null);
 
-const TOKEN_KEY = "fg_access_token";
-const USER_KEY = "fg_user";
-const LAST_ACTIVITY_KEY = "fg_last_activity";
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 phút (tính bằng mili giây)
+const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 phút
+const LEGACY_KEYS = ["fg_access_token", "fg_user", "fg_last_activity"];
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const raw = localStorage.getItem(USER_KEY);
-    return raw ? JSON.parse(raw) : null;
-  });
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
+  // Chỉ giữ thông tin hiển thị của user trong bộ nhớ. Token nằm trong HttpOnly Cookie.
+  const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  const lastActivityRef = useRef(Date.now());
 
-  // Cập nhật mốc thời gian hoạt động cuối cùng
-  const updateLastActivity = useCallback(() => {
-    if (localStorage.getItem(TOKEN_KEY)) {
-      localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
-    }
+  const login = useCallback((nextUser) => {
+    lastActivityRef.current = Date.now();
+    setUser(nextUser);
   }, []);
 
-  const persistSession = useCallback(
-    (nextToken, nextUser) => {
-      if (nextToken) {
-        localStorage.setItem(TOKEN_KEY, nextToken);
-        setToken(nextToken);
-      }
-      if (nextUser) {
-        localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
-        setUser(nextUser);
-      }
-      updateLastActivity();
-    },
-    [updateLastActivity]
-  );
-
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    localStorage.removeItem(LAST_ACTIVITY_KEY);
-    setToken(null);
+  const logout = useCallback(async () => {
+    try {
+      await authApi.logout(); // Server xóa cookie phiên
+    } catch {
+      // Cookie đã hết hạn hoặc mạng lỗi: vẫn đăng xuất ở giao diện
+    }
     setUser(null);
   }, []);
 
-  // 1. Kiểm tra session trên LocalStorage khi F5 (Không auto-logout nếu API me() bị lỗi mạng)
+  // 1. Khi tải trang / F5: hỏi server xem cookie còn hợp lệ không
   useEffect(() => {
     let cancelled = false;
 
+    // Dọn token cũ còn lưu ở localStorage từ phiên bản trước
+    LEGACY_KEYS.forEach((key) => localStorage.removeItem(key));
+
     async function checkSession() {
-      if (!token) {
-        setInitializing(false);
-        return;
-      }
-
-      // Kiểm tra xem đã hết 30 phút không hoạt động từ lần cuối chưa
-      const lastActivity = parseInt(
-        localStorage.getItem(LAST_ACTIVITY_KEY) || "0",
-        10
-      );
-      if (lastActivity && Date.now() - lastActivity > INACTIVITY_TIMEOUT) {
-        logout();
-        setInitializing(false);
-        return;
-      }
-
-      // Thử xác thực với Backend (Nếu backend chưa có endpoint /me thì giữ nguyên session cũ)
       try {
-        if (authApi?.me) {
-          const { data } = await authApi.me();
-          if (!cancelled && data?.user) {
-            setUser(data.user);
-            localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-          }
+        const { data } = await authApi.me();
+        if (!cancelled) {
+          lastActivityRef.current = Date.now();
+          setUser(data);
         }
-      } catch (err) {
-        // Chỉ logout khi server phản hồi chính xác mã 401 Unauthorized
-        if (!cancelled && err.response?.status === 401) {
-          logout();
-        }
+      } catch {
+        if (!cancelled) setUser(null);
       } finally {
         if (!cancelled) setInitializing(false);
       }
@@ -96,12 +58,19 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 2. Theo dõi thao tác người dùng: Tự động Đăng xuất sau 30 phút treo máy
+  // 2. Bất kỳ API nào trả 401 (cookie hết hạn) -> đăng xuất giao diện
   useEffect(() => {
-    if (!token) return;
+    const onUnauthorized = () => setUser(null);
+    window.addEventListener("auth:unauthorized", onUnauthorized);
+    return () =>
+      window.removeEventListener("auth:unauthorized", onUnauthorized);
+  }, []);
+
+  // 3. Tự đăng xuất sau 30 phút không thao tác
+  useEffect(() => {
+    if (!user) return;
 
     const events = [
       "mousedown",
@@ -110,51 +79,28 @@ export function AuthProvider({ children }) {
       "scroll",
       "touchstart",
     ];
-
-    const handleUserActivity = () => {
-      const lastActivity = parseInt(
-        localStorage.getItem(LAST_ACTIVITY_KEY) || "0",
-        10
-      );
-      const now = Date.now();
-
-      if (lastActivity && now - lastActivity > INACTIVITY_TIMEOUT) {
-        logout();
-      } else {
-        updateLastActivity();
-      }
+    const markActive = () => {
+      lastActivityRef.current = Date.now();
     };
+    events.forEach((e) => window.addEventListener(e, markActive));
 
-    // Gắn sự kiện lắng nghe người dùng tương tác
-    events.forEach((event) =>
-      window.addEventListener(event, handleUserActivity)
-    );
-
-    // Vòng lặp kiểm tra định kỳ mỗi 1 phút
     const interval = setInterval(() => {
-      const lastActivity = parseInt(
-        localStorage.getItem(LAST_ACTIVITY_KEY) || "0",
-        10
-      );
-      if (lastActivity && Date.now() - lastActivity > INACTIVITY_TIMEOUT) {
+      if (Date.now() - lastActivityRef.current > INACTIVITY_TIMEOUT) {
         logout();
       }
     }, 60000);
 
     return () => {
-      events.forEach((event) =>
-        window.removeEventListener(event, handleUserActivity)
-      );
+      events.forEach((e) => window.removeEventListener(e, markActive));
       clearInterval(interval);
     };
-  }, [token, logout, updateLastActivity]);
+  }, [user, logout]);
 
   const value = {
     user,
-    token,
-    isAuthenticated: Boolean(token && user),
+    isAuthenticated: Boolean(user),
     initializing,
-    login: (nextToken, nextUser) => persistSession(nextToken, nextUser),
+    login,
     logout,
   };
 
