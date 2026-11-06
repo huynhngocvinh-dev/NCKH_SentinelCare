@@ -156,7 +156,7 @@ export const ERROR_HINTS = {
   GATEWAY_NOT_CONFIGURED:
     "Hệ thống thanh toán đang được cấu hình. Vui lòng quay lại sau.",
   GATEWAY_TIMEOUT:
-    "Giao dịch chưa bị trừ tiền. Bạn có thể thử lại sau ít phút.",
+    "Nếu lỗi lặp lại, hãy kiểm tra kết nối mạng của máy chủ rồi thử lại.",
   GATEWAY_ERROR:
     "Giao dịch chưa bị trừ tiền. Vui lòng thử lại hoặc chọn phương thức khác.",
   AMOUNT_TOO_LARGE: "Hãy chọn Ví MoMo cho giao dịch giá trị lớn.",

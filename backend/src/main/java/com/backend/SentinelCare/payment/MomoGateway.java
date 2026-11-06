@@ -13,6 +13,7 @@ import okhttp3.Response;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -41,8 +42,11 @@ public class MomoGateway implements PaymentGateway {
     private static final Set<Integer> NON_FINAL_CODES = Set.of(8000, 8200, 9000, 7000, 7002);
 
     private static class GatewayCommunicationException extends RuntimeException {
-        GatewayCommunicationException(String message, Throwable cause) {
+        final boolean network; // true = lỗi mạng/timeout; false = MoMo có phản hồi nhưng không đọc được
+
+        GatewayCommunicationException(String message, boolean network, Throwable cause) {
             super(message, cause);
+            this.network = network;
         }
     }
 
@@ -131,8 +135,12 @@ public class MomoGateway implements PaymentGateway {
         try {
             json = post("/v2/gateway/api/create", body);
         } catch (GatewayCommunicationException e) {
-            throw new BusinessException(HttpStatus.BAD_GATEWAY, "GATEWAY_TIMEOUT",
-                    "Không kết nối được cổng MoMo. Giao dịch chưa bị trừ tiền, vui lòng thử lại.");
+            log.error("[MOMO] Tạo liên kết thanh toán ({}) thất bại: {}", requestType, e.getMessage(), e.getCause());
+            throw new BusinessException(HttpStatus.BAD_GATEWAY,
+                    e.network ? "GATEWAY_TIMEOUT" : "GATEWAY_BAD_RESPONSE",
+                    e.network
+                            ? "Không kết nối được tới MoMo (lỗi mạng hoặc quá thời gian chờ). Giao dịch chưa bị trừ tiền, vui lòng thử lại."
+                            : "MoMo trả về phản hồi không hợp lệ cho yêu cầu thanh toán. Vui lòng liên hệ quản trị viên.");
         }
 
         int code = json.path("resultCode").asInt(-1);
@@ -409,19 +417,34 @@ public class MomoGateway implements PaymentGateway {
     }
 
     private JsonNode post(String path, Map<String, Object> body) {
+        String url = baseUrl + path;
         try {
             RequestBody requestBody = RequestBody.create(
                     mapper.writeValueAsString(body), MediaType.parse("application/json; charset=UTF-8"));
-            Request request = new Request.Builder().url(baseUrl + path).post(requestBody).build();
+            Request request = new Request.Builder().url(url).post(requestBody).build();
+
             try (Response response = httpClient.newCall(request).execute()) {
                 String text = response.body() != null ? response.body().string() : "";
-                if (text.isBlank())
-                    throw new IOException("Phản hồi rỗng (HTTP " + response.code() + ")");
-                return mapper.readTree(text);
+                if (text.isBlank()) {
+                    throw new GatewayCommunicationException(
+                            "MoMo trả về phản hồi rỗng (HTTP " + response.code() + ") tại " + url, false, null);
+                }
+                try {
+                    return mapper.readTree(text);
+                } catch (JsonProcessingException e) {
+                    throw new GatewayCommunicationException("MoMo trả về dữ liệu không phải JSON (HTTP "
+                            + response.code() + ") tại " + url + ": " + abbreviate(text), false, e);
+                }
             }
         } catch (IOException e) {
-            throw new GatewayCommunicationException("Lỗi kết nối MoMo " + path, e);
+            throw new GatewayCommunicationException("Lỗi mạng khi gọi " + url + ": "
+                    + e.getClass().getSimpleName() + " - " + e.getMessage(), true, e);
         }
+    }
+
+    private String abbreviate(String text) {
+        String oneLine = text.replaceAll("\\s+", " ").trim();
+        return oneLine.length() > 300 ? oneLine.substring(0, 300) + "..." : oneLine;
     }
 
     private String sign(String raw) {

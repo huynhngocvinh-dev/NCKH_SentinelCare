@@ -7,4 +7,7 @@ export default defineConfig({
   define: {
     global: "window",
   },
+  server: {
+    allowedHosts: true, // Cho phép tất cả các host ngrok truy cập
+  },
 });
