@@ -15,8 +15,10 @@ public final class SubscriptionDtos {
         // ---------- Request ----------
         public record SubscribeRequest(
                         @NotNull(message = "Vui lòng chọn gói dịch vụ") @JsonProperty("plan_id") Integer planId,
-                        @JsonProperty("payment_method") String paymentMethod, // MOMO_WALLET | MOMO_CARD
-                        @JsonProperty("auto_renew_consent") Boolean autoRenewConsent) {
+                        @JsonProperty("payment_method") String paymentMethod) {
+        }
+
+        public record RenewRequest(@JsonProperty("payment_method") String paymentMethod) {
         }
 
         public record CancelAutoRenewRequest(String reason, String feedback) {
@@ -24,10 +26,6 @@ public final class SubscriptionDtos {
 
         // ---------- Response ----------
         public record FeatureDto(Integer id, String code, String name) {
-        }
-
-        public record PaymentMethodResponse(Long id, String type, String brand, String last4, String displayName,
-                        String status, boolean defaultMethod, Instant createdAt) {
         }
 
         public record NextBilling(String planName, BigDecimal amount, Instant date) {
@@ -50,9 +48,9 @@ public final class SubscriptionDtos {
                         Instant currentPeriodEnd,
                         long daysRemaining,
                         boolean autoRenew,
+                        boolean canRenewNow,
                         Instant gracePeriodEnd,
                         String lastPaymentError,
-                        PaymentMethodResponse paymentMethod,
                         NextBilling nextBilling,
                         PendingChange pendingChange,
                         List<FeatureDto> features) {
@@ -76,7 +74,7 @@ public final class SubscriptionDtos {
                         String summary) {
         }
 
-        // result: PENDING_PAYMENT (chuyển sang MoMo) | ACTIVATED | DOWNGRADE_SCHEDULED
+        // result: PENDING_PAYMENT | ACTIVATED | DOWNGRADE_SCHEDULED
         public record SubscribeResponse(String result, Long invoiceId, String paymentUrl,
                         BigDecimal amount, String message, Instant effectiveAt) {
         }

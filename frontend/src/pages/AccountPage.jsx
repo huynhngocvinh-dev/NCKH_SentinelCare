@@ -105,13 +105,10 @@ export default function AccountPage() {
               : subscription.lifetime
               ? "Gói trọn đời, không cần gia hạn."
               : subscription.autoRenew && subscription.nextBilling
-              ? `Tự động gia hạn ngày ${formatDate(
+              ? `Đến kỳ gia hạn ngày ${formatDate(
                   subscription.nextBilling.date
-                )}${
-                  subscription.paymentMethod
-                    ? ` bằng ${subscription.paymentMethod.displayName}`
-                    : ""
-                }.`
+                )}
+              , bạn sẽ được nhắc để gia hạn.`
               : `Gói dùng được đến ${formatDate(
                   subscription.currentPeriodEnd
                 )}, không tự động gia hạn.`}

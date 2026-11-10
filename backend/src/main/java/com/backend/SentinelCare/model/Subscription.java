@@ -8,10 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(
-    name = "subscriptions",
-    uniqueConstraints = @UniqueConstraint(name = "uk_subscriptions_user", columnNames = "user_id")
-)
+@Table(name = "subscriptions", uniqueConstraints = @UniqueConstraint(name = "uk_subscriptions_user", columnNames = "user_id"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,7 +16,9 @@ import java.time.LocalDateTime;
 @Builder
 public class Subscription {
 
-    public enum Status { ACTIVE, GRACE_PERIOD, EXPIRED }
+    public enum Status {
+        ACTIVE, GRACE_PERIOD, EXPIRED
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,17 +50,13 @@ public class Subscription {
     @Column(name = "current_period_end")
     private LocalDateTime currentPeriodEnd;
 
-    // Số tiền đã trả cho kỳ hiện tại (dùng để quy đổi khi nâng gói)
+    // TRUE = còn tiếp tục gia hạn (được nhắc và có ân hạn); FALSE = hết kỳ là hết
+    // hạn
     @Column(name = "current_period_amount", precision = 12, scale = 2)
     private BigDecimal currentPeriodAmount;
 
     @Column(name = "auto_renew", nullable = false)
     private boolean autoRenew;
-
-    // Phương thức (token) dùng để trừ tiền tự động
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "payment_method_id")
-    private UserPaymentMethod paymentMethod;
 
     // Hết hạn ân hạn (chỉ có khi GRACE_PERIOD)
     @Column(name = "grace_period_end")

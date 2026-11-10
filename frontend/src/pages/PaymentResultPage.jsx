@@ -36,7 +36,7 @@ export default function PaymentResultPage() {
   // Các tham số trên URL quay về do MoMo ký: gửi backend xác thực chữ ký rồi cập nhật hóa đơn.
   // Backend xử lý một lần duy nhất cho mỗi hóa đơn nên gọi lặp với IPN cũng không bị trừ trùng.
   useEffect(() => {
-    if (!params.signature) return;
+    if (!params.vnp_SecureHash) return;
     let cancelled = false;
     subscriptionApi
       .confirmReturn(params)
@@ -153,21 +153,13 @@ export default function PaymentResultPage() {
 
             {subscription?.autoRenew && subscription.currentPeriodEnd && (
               <p className="mb-5 text-xs text-gray-500">
-                Gói sẽ tự động gia hạn vào{" "}
+                Đến ngày {formatDate(subscription.currentPeriodEnd)} bạn sẽ được
+                nhắc gia hạn. Bạn có thể hủy gia hạn bất kỳ lúc nào trong mục
+                Gói của tôi.
                 {formatDate(subscription.currentPeriodEnd)}. Bạn có thể hủy bất
                 kỳ lúc nào trong mục Gói của tôi.
               </p>
             )}
-            {subscription &&
-              !subscription.autoRenew &&
-              !subscription.lifetime &&
-              subscription.status !== "FREE" && (
-                <p className="mb-5 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
-                  Gói đã kích hoạt nhưng chưa bật được tự động gia hạn. Bạn vẫn
-                  dùng đủ quyền lợi đến{" "}
-                  {formatDate(subscription.currentPeriodEnd)}.
-                </p>
-              )}
 
             <Link
               to="/goi-cua-toi"

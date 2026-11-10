@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  backend:
+    build: .
+    container_name: backend_app
+    ports:
+      - "8080:8080"
+    environment:
+      # Database Credentials
+      - DB_URL=${DB_URL}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+
+      # Redis
+      - REDIS_HOST=${REDIS_HOST:-host.docker.internal}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+
+      # Mail Server
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+
+      # JWT Config
+      - JWT_SECRET=${JWT_SECRET}
+
+      # Google AI Key
+      - GOOGLE_AI_KEY=${GOOGLE_AI_KEY}
+
+      # Stringee
+      - STRINGEE_KEY_SID=${STRINGEE_KEY_SID}
+      - STRINGEE_KEY_SECRET=${STRINGEE_KEY_SECRET}
+      - STRINGEE_FROM_NUMBER=${STRINGEE_FROM_NUMBER}
+
+      # MoMo & Payment
+      - PAYMENT_TOKEN_KEY=${PAYMENT_TOKEN_KEY}
+      - MOMO_BASE_URL=${MOMO_BASE_URL}
+      - MOMO_PARTNER_CODE=${MOMO_PARTNER_CODE}
+      - MOMO_ACCESS_KEY=${MOMO_ACCESS_KEY}
+      - MOMO_SECRET_KEY=${MOMO_SECRET_KEY}
+      - MOMO_STORE_ID=${MOMO_STORE_ID}
+      - MOMO_RSA_PUBLIC_KEY=${MOMO_RSA_PUBLIC_KEY}
+
+      # VNPay Payment
+      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE}
+      - VNPAY_HASH_SECRET=${VNPAY_HASH_SECRET}
+
+      # Application URLs
+      - APP_PUBLIC_BASE_URL=${APP_PUBLIC_BASE_URL}
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
+    restart: always

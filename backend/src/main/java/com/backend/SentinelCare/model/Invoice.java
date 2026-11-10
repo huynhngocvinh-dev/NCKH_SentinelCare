@@ -64,19 +64,13 @@ public class Invoice {
     @Column(nullable = false, length = 3)
     private String currency = "VND";
 
-    // MOMO_WALLET | MOMO_CARD | TOKEN (trừ tiền ngầm bằng token đã lưu)
+    // Kênh thanh toán đã chọn: xem PaymentChannel.
     @Column(name = "method_type", length = 20)
     private String methodType;
 
     @ToString.Exclude
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "payment_method_id")
-    private UserPaymentMethod paymentMethod;
 
-    @Column(name = "partner_client_id", length = 64)
-    private String partnerClientId;
-
-    // Chống trừ tiền trùng: RENEW_{subscription_id}_{yyyyMMdd của
+    // Chống trừ tiền trùng: RENEW_{    subscription_id}_{yyyyMMdd của
     // current_period_end, UTC}
     @Column(name = "idempotency_key", nullable = false, length = 100)
     private String idempotencyKey;
@@ -96,13 +90,6 @@ public class Invoice {
 
     @Column(name = "last_attempt_at")
     private LocalDateTime lastAttemptAt;
-
-    // Bằng chứng người dùng đồng ý ủy quyền tự động gia hạn
-    @Column(name = "auto_renew_consent")
-    private Boolean autoRenewConsent;
-
-    @Column(name = "consent_at")
-    private LocalDateTime consentAt;
 
     @Column(name = "period_start")
     private LocalDateTime periodStart;

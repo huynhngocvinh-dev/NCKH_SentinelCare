@@ -32,10 +32,6 @@ export const billingUnit = (plan) => {
   return `${days} ngày`;
 };
 
-// Thông báo minh bạch trước khi thanh toán (đúng nội dung đặc tả)
-export const consentText = (unit) =>
-  `Bằng việc bấm Thanh toán, bạn đồng ý cho phép ${APP_NAME} tự động gia hạn gói dịch vụ này mỗi ${unit}. Bạn có thể hủy bất kỳ lúc nào.`;
-
 // Trạng thái gói
 export const STATUS_META = {
   FREE: {
@@ -86,25 +82,6 @@ export const INVOICE_STATUS = {
   CANCELED: { label: "Đã hủy", cls: "bg-slate-200 text-slate-700" },
 };
 
-// Phương thức thanh toán (cả hai đều hỗ trợ tự động gia hạn qua token do MoMo cấp)
-export const PAYMENT_METHODS = [
-  {
-    code: "MOMO_WALLET",
-    name: "Ví MoMo",
-    desc: "Liên kết ví MoMo, xác thực ủy quyền một lần",
-    color: "bg-pink-600 text-white",
-    letter: "M",
-    badge: "Đề xuất",
-  },
-  {
-    code: "MOMO_CARD",
-    name: "Thẻ Visa / Mastercard",
-    desc: "Nhập thẻ trên trang bảo mật của MoMo",
-    color: "bg-indigo-100 text-indigo-600",
-    letter: "V",
-  },
-];
-
 // Lý do hủy gia hạn (thu thập feedback)
 export const CANCEL_REASONS = [
   { value: "TOO_EXPENSIVE", label: "Giá quá cao" },
@@ -133,14 +110,6 @@ export const ACTION_META = {
   GRACE_RECOVERED: { label: "Khôi phục sau ân hạn", tone: "success" },
   EXPIRED: { label: "Gói hết hạn", tone: "danger" },
   CANCELLED_IMMEDIATELY: { label: "Hủy gói", tone: "danger" },
-  PAYMENT_METHOD_ADDED: {
-    label: "Liên kết phương thức thanh toán",
-    tone: "info",
-  },
-  PAYMENT_METHOD_REMOVED: {
-    label: "Xóa phương thức thanh toán",
-    tone: "neutral",
-  },
 };
 
 export const TONE_CLASSES = {
@@ -150,18 +119,46 @@ export const TONE_CLASSES = {
   info: "bg-blue-500",
   neutral: "bg-slate-400",
 };
+// Lưu ý trước khi thanh toán gói theo kỳ
+export const renewalNotice = (unit) =>
+  `Gói được tính theo ${unit}. Đến mỗi kỳ, ${APP_NAME} sẽ nhắc bạn gia hạn và bạn xác nhận thanh toán qua VNPAY. Chúng tôi không lưu thông tin thẻ của bạn. Bạn có thể hủy gia hạn bất kỳ lúc nào.`;
 
-// Gợi ý hành động theo mã lỗi nghiệp vụ từ backend
+// Kênh thanh toán (giá trị gửi lên backend = tên enum PaymentChannel)
+export const PAYMENT_METHODS = [
+  {
+    code: "ANY",
+    name: "Chọn tại trang VNPAY",
+    desc: "QR, thẻ ATM, thẻ quốc tế... chọn khi thanh toán",
+    color: "bg-blue-100 text-blue-600",
+    letter: "V",
+  },
+  {
+    code: "VNPAY_QR",
+    name: "Quét mã VNPAY-QR",
+    desc: "Dùng app ngân hàng hỗ trợ VNPAY-QR",
+    color: "bg-sky-100 text-sky-600",
+    letter: "Q",
+  },
+  {
+    code: "DOMESTIC_BANK",
+    name: "Thẻ ATM / tài khoản ngân hàng",
+    desc: "Ngân hàng nội địa, xác thực OTP",
+    color: "bg-emerald-100 text-emerald-600",
+    letter: "N",
+  },
+  {
+    code: "INTERNATIONAL_CARD",
+    name: "Thẻ quốc tế",
+    desc: "Visa, Mastercard, JCB",
+    color: "bg-indigo-100 text-indigo-600",
+    letter: "I",
+  },
+];
+
 export const ERROR_HINTS = {
   GATEWAY_NOT_CONFIGURED:
     "Hệ thống thanh toán đang được cấu hình. Vui lòng quay lại sau.",
-  GATEWAY_TIMEOUT:
-    "Nếu lỗi lặp lại, hãy kiểm tra kết nối mạng của máy chủ rồi thử lại.",
-  GATEWAY_ERROR:
-    "Giao dịch chưa bị trừ tiền. Vui lòng thử lại hoặc chọn phương thức khác.",
-  AMOUNT_TOO_LARGE: "Hãy chọn Ví MoMo cho giao dịch giá trị lớn.",
   CHANGE_NOT_ALLOWED:
     "Hãy kiểm tra lại gói hiện tại của bạn trong mục Gói của tôi.",
-  CONSENT_REQUIRED:
-    "Bạn cần đồng ý ủy quyền tự động gia hạn để đăng ký gói theo chu kỳ.",
+  NOT_DUE: "Bạn sẽ nhận được nhắc nhở khi gói gần đến hạn.",
 };

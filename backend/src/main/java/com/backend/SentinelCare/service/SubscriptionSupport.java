@@ -79,10 +79,6 @@ public class SubscriptionSupport {
         return plan.getDurationDays() == null ? null : startUtc.plusDays(plan.getDurationDays());
     }
 
-    public boolean isFree(ServicePackage plan) {
-        return plan.getPrice() == null || plan.getPrice().signum() == 0;
-    }
-
     public String displayName(Account user) {
         return userProfileRepository.findByAccountId(user.getId()).map(UserProfile::getFullName).orElse("bạn");
     }

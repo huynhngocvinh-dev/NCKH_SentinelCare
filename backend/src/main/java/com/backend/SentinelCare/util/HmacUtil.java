@@ -7,35 +7,35 @@ import java.security.MessageDigest;
 
 public final class HmacUtil {
 
+    private static final String HMAC_SHA512 = "HmacSHA512";
+
     private HmacUtil() {
     }
 
-    // Tạo chữ ký HMAC SHA256 dạng Hex cho MoMo
-    public static String hmacSha256Hex(String key, String data) {
+    /** Chữ ký HMAC-SHA512. */
+    public static String hmacSha512Hex(String key, String data) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
-            mac.init(secretKey);
+            Mac mac = Mac.getInstance(HMAC_SHA512);
+            mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), HMAC_SHA512));
             byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
-            StringBuilder hexString = new StringBuilder();
+
+            StringBuilder hex = new StringBuilder(hash.length * 2);
             for (byte b : hash) {
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0');
-                }
-                hexString.append(hex);
+                hex.append(String.format("%02x", b));
             }
-            return hexString.toString();
+            return hex.toString();
         } catch (Exception e) {
-            throw new RuntimeException("Lỗi tính toán chữ ký HMAC SHA256", e);
+            throw new IllegalStateException("Không thể tính chữ ký HMAC-SHA512", e);
         }
     }
 
-    // So sánh chữ ký thời gian thực (chống tấn công Timing Attack)
+    /** So sánh chữ ký trong thời gian không đổi (chống timing attack). */
     public static boolean constantTimeEquals(String a, String b) {
         if (a == null || b == null) {
-            return a == b;
+            return false; // thiếu chữ ký thì không bao giờ hợp lệ
         }
-        return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8), b.getBytes(StandardCharsets.UTF_8));
+        return MessageDigest.isEqual(
+                a.toLowerCase().getBytes(StandardCharsets.UTF_8),
+                b.toLowerCase().getBytes(StandardCharsets.UTF_8));
     }
 }

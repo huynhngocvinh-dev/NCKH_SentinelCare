@@ -65,19 +65,19 @@ export const subscriptionApi = {
   getPlans: () => api.get(`${SUB}/plans`),
   getMy: () => api.get(`${SUB}/me`),
   quote: (planId) => api.get(`${SUB}/quote`, { params: { plan_id: planId } }),
-  // Khởi tạo giao dịch auto-debit: trả về paymentUrl để chuyển sang MoMo
+  // Khởi tạo thanh toán: trả về paymentUrl
   subscribe: (payload) => api.post(`${SUB}/subscribe`, payload),
+  // Gia hạn trong ân hạn hoặc gia hạn sớm: cũng trả về paymentUrl
+  renew: (payload) => api.post(`${SUB}/renew`, payload ?? {}),
   cancelAutoRenew: (payload) => api.post(`${SUB}/cancel-auto-renew`, payload),
   resumeAutoRenew: () => api.post(`${SUB}/resume-auto-renew`),
   cancelPendingChange: () => api.delete(`${SUB}/pending-change`),
   getInvoices: (page = 0, size = 8) =>
     api.get(`${SUB}/invoices`, { params: { page, size } }),
   getInvoice: (id) => api.get(`${SUB}/invoices/${id}`),
-  getPaymentMethods: () => api.get(`${SUB}/payment-methods`),
-  removePaymentMethod: (id) => api.delete(`${SUB}/payment-methods/${id}`),
   getHistory: (page = 0, size = 8) =>
     api.get(`${SUB}/history`, { params: { page, size } }),
-  // Tham số MoMo đính trên URL quay về (đã được MoMo ký): backend tự kiểm tra chữ ký rồi cập nhật hóa đơn
+  // Tham số VNPAY đính trên URL quay về (đã được VNPAY ký): backend tự kiểm tra chữ ký rồi cập nhật hóa đơn
   confirmReturn: (params) => api.post("/v1/payments/return", { params }),
 };
 
