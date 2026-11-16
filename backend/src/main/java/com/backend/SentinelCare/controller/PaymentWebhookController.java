@@ -41,7 +41,7 @@ public class PaymentWebhookController {
                 default -> ipn("99", "Unknown error");
             });
         } catch (Exception e) {
-            log.error("Lỗi xử lý IPN VNPAY", e);
+            log.error("Loi xu ly IPN VNPAY", e);
             return ResponseEntity.ok(ipn("99", "Unknown error"));
         }
     }

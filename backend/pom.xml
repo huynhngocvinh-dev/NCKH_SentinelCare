@@ -66,12 +66,7 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- thư viện OkHttp (để gọi API ZegoCloud/GSM/TTS) -->
-        <dependency>
-            <groupId>com.squareup.okhttp3</groupId>
-            <artifactId>okhttp</artifactId>
-            <version>4.12.0</version>
-        </dependency>
+        
 
         <!-- Redis -->
         <dependency>
@@ -103,12 +98,6 @@
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
 
-        <!-- Thư viện Auth0 JWT để tạo Token kết nối Stringee Call API -->
-        <dependency>
-            <groupId>com.auth0</groupId>
-            <artifactId>java-jwt</artifactId>
-            <version>4.4.0</version>
-        </dependency>
 
         <!-- Thư viện Spring Boot WebSocket cho NotificationService -->
         <dependency>
@@ -121,6 +110,12 @@
             <groupId>io.github.cdimascio</groupId>
             <artifactId>dotenv-java</artifactId>
             <version>3.0.0</version>
+        </dependency>
+        <!-- thư viện dịch vụ call twilio -->
+        <dependency>
+            <groupId>com.twilio.sdk</groupId>
+            <artifactId>twilio</artifactId>
+            <version>10.6.3</version>
         </dependency>
 
     </dependencies>

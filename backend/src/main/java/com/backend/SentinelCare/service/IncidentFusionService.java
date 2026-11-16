@@ -20,10 +20,11 @@ public class IncidentFusionService {
 
     private final FallIncidentRepository incidentRepository;
 
-     /**
-     * Dung hợp sự cố Camera vào sự cố IoT sẵn có CỦA CÙNG TÀI KHOẢN (nếu xảy ra trong vòng 5s)
+    /**
+     * Dung hợp sự cố Camera vào sự cố IoT sẵn có CỦA CÙNG TÀI KHOẢN (nếu xảy ra
+     * trong vòng 5s)
      */
-     public FallIncident fuseCameraEvent(CameraDevice camera, CameraWebhookRequest request) {
+    public FallIncident fuseCameraEvent(CameraDevice camera, CameraWebhookRequest request) {
         Long accountId = (camera.getAddress() != null && camera.getAddress().getAccount() != null)
                 ? camera.getAddress().getAccount().getId()
                 : null;
@@ -39,7 +40,8 @@ public class IncidentFusionService {
             incident.setCameraDevice(camera);
             incident.setSnapshotUrl(request.getSnapshotBase64());
             incident.setConfidenceScore(confidence);
-            log.info(" [FUSION] gop su co Camera ({}) vao su co IoT (ID: {}) dang cho!", camera.getCameraCode(), incident.getId());
+            log.info(" [FUSION] gop su co Camera ({}) vao su co IoT (ID: {}) dang cho!", camera.getCameraCode(),
+                    incident.getId());
             return incident;
         }
 
@@ -53,7 +55,8 @@ public class IncidentFusionService {
     }
 
     /**
-     * Dung hợp sự cố IoT vào sự cố Camera sẵn có CỦA CÙNG TÀI KHOẢN (nếu xảy ra trong vòng 5s)
+     * Dung hợp sự cố IoT vào sự cố Camera sẵn có CỦA CÙNG TÀI KHOẢN (nếu xảy ra
+     * trong vòng 5s)
      */
     public FallIncident fuseIotEvent(IotDevice device, MonitoredSubject patient, IotEventRequest request) {
         Long accountId = (patient != null && patient.getAccount() != null)
@@ -68,7 +71,8 @@ public class IncidentFusionService {
             incident.setPatient(patient);
             incident.setLatitude(request.getLatitude());
             incident.setLongitude(request.getLongitude());
-            log.info(" [FUSION] gop su co IoT ({}) vao su co Camera (ID: {}) dang cho!", device.getDeviceSerial(), incident.getId());
+            log.info(" [FUSION] gop su co IoT ({}) vao su co Camera (ID: {}) dang cho!", device.getDeviceSerial(),
+                    incident.getId());
             return incident;
         }
 
@@ -82,16 +86,43 @@ public class IncidentFusionService {
                 .build();
     }
 
-    // Chỉ tìm sự cố PENDING trong 5s gần nhất của đúng tài khoản; không rõ chủ thì không gộp
+    // Chỉ tìm sự cố PENDING trong 5s gần nhất của đúng tài khoản; không rõ chủ thì
+    // không gộp
     private Optional<FallIncident> findRecentPendingIncident(Long accountId) {
-        if (accountId == null) return Optional.empty();
+        if (accountId == null)
+            return Optional.empty();
         return incidentRepository.findRecentByOwnerAccountIdAndStatus(
-                        accountId,
-                        LocalDateTime.now().minusSeconds(5),
-                        FallIncident.IncidentStatus.PENDING,
-                        PageRequest.of(0, 1))
+                accountId,
+                LocalDateTime.now().minusSeconds(5),
+                FallIncident.IncidentStatus.PENDING,
+                PageRequest.of(0, 1))
                 .stream().findFirst();
     }
+
+    /**
+     * Câu dành cho TTS: giờ/phút bằng chữ, không đọc tọa độ (tọa độ đã có trong
+     * email và WebApp).
+     */
+    public String buildVoiceAlertText(FallIncident incident) {
+        String who = incident.getPatient() != null && incident.getPatient().getFullName() != null
+                ? incident.getPatient().getFullName()
+                : "một người chưa xác định danh tính";
+
+        String where = "";
+        if (incident.getCameraDevice() != null && incident.getCameraDevice().getLocationName() != null) {
+            where = " tại " + incident.getCameraDevice().getLocationName();
+        } else if (incident.getLatitude() != null) {
+            where = ", vị trí GPS đã được gửi qua email";
+        }
+
+        String when = incident.getIncidentTime() == null ? ""
+                : " Thời điểm phát hiện: " + incident.getIncidentTime().getHour() + " giờ "
+                        + incident.getIncidentTime().getMinute() + " phút.";
+
+        return "Cảnh báo khẩn cấp từ SentinelCare. Hệ thống phát hiện " + who + " bị té ngã" + where + "."
+                + when + " Vui lòng kiểm tra ngay.";
+    }
+
     /**
      * Soạn thảo văn bản thông báo gộp linh hoạt theo nguồn dữ liệu
      */
@@ -107,18 +138,26 @@ public class IncidentFusionService {
 
         if (hasIot && hasCam) {
             String patientName = incident.getPatient() != null ? incident.getPatient().getFullName() : "Người giám sát";
-            String gps = (incident.getLatitude() != null) ? String.format("tại tọa độ (%.4f, %.4f)", incident.getLatitude(), incident.getLongitude()) : "";
-            String camLocation = incident.getCameraDevice() != null ? incident.getCameraDevice().getLocationName() : "Khu vực giám sát";
+            String gps = (incident.getLatitude() != null)
+                    ? String.format("tại tọa độ (%.4f, %.4f)", incident.getLatitude(), incident.getLongitude())
+                    : "";
+            String camLocation = incident.getCameraDevice() != null ? incident.getCameraDevice().getLocationName()
+                    : "Khu vực giám sát";
 
-            sb.append(String.format("Phát hiện %s té ngã %s từ thiết bị đeo, ĐỒNG THỜI Camera ghi nhận té ngã tại %s vào lúc %s.",
+            sb.append(String.format(
+                    "Phát hiện %s té ngã %s từ thiết bị đeo, ĐỒNG THỜI Camera ghi nhận té ngã tại %s vào lúc %s.",
                     patientName, gps, camLocation, timeStr));
         } else if (hasIot) {
             String patientName = incident.getPatient() != null ? incident.getPatient().getFullName() : "Người thân";
-            String gps = (incident.getLatitude() != null) ? String.format("tại vị trí GPS (%.4f, %.4f)", incident.getLatitude(), incident.getLongitude()) : "ở nhà";
+            String gps = (incident.getLatitude() != null)
+                    ? String.format("tại vị trí GPS (%.4f, %.4f)", incident.getLatitude(), incident.getLongitude())
+                    : "ở nhà";
             sb.append(String.format("Phát hiện %s bị ngã %s vào lúc %s.", patientName, gps, timeStr));
         } else if (hasCam) {
-            String camLocation = incident.getCameraDevice() != null ? incident.getCameraDevice().getLocationName() : "Phòng khách";
-            sb.append(String.format("Camera AI phát hiện người ngã (chưa xác định danh tính) tại %s vào lúc %s.", camLocation, timeStr));
+            String camLocation = incident.getCameraDevice() != null ? incident.getCameraDevice().getLocationName()
+                    : "Phòng khách";
+            sb.append(String.format("Camera AI phát hiện người ngã (chưa xác định danh tính) tại %s vào lúc %s.",
+                    camLocation, timeStr));
         } else {
             sb.append("Phát hiện sự cố té ngã khẩn cấp! Vui lòng kiểm tra ngay.");
         }

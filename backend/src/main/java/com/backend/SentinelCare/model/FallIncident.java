@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "address"})
+@org.hibernate.annotations.DynamicUpdate
 public class FallIncident {
 
     @Id

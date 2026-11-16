@@ -8,6 +8,7 @@ import java.util.List;
 
 @Repository
 public interface EmergencyContactRepository extends JpaRepository<EmergencyContact, Long> {
+    long countByAccountIdAndAccountOwnerFalse(Long accountId);
 
     // Danh sách người thân của 1 tài khoản, đã xếp theo mức ưu tiên tăng dần
     List<EmergencyContact> findByAccountIdOrderByPriorityOrderAsc(Long accountId);

@@ -57,7 +57,7 @@ public class InvoiceSettlementService {
 
         // Chống sửa số tiền: phải đúng số tiền của hóa đơn
         if (invoice.getAmount().longValue() != notification.amount()) {
-            log.warn("Sai số tiền hóa đơn {}: cổng báo {}, hóa đơn {}",
+            log.warn("Sai so tien hoa don {}: cong bao {}, hoa don {}",
                     invoice.getId(), notification.amount(), invoice.getAmount());
             return Result.AMOUNT_MISMATCH;
         }

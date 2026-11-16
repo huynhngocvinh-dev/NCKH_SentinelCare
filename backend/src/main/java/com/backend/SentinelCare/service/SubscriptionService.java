@@ -66,6 +66,7 @@ public class SubscriptionService {
 
     // Quyền dùng tính năng. Gói đang ân hạn (GRACE_PERIOD) vẫn giữ nguyên quyền
     // lợi.
+    @Transactional(readOnly = true)
     public boolean hasFeatureAccess(Long userId, String featureCode) {
         LocalDateTime now = Utc.now();
         ServicePackage plan = subscriptionRepository.findByUserId(userId)

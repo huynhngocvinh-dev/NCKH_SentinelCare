@@ -38,8 +38,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.equals("/api/auth/logout")
                 || path.equals("/api/incidents/webhook/camera")
                 || path.equals("/api/incidents/iot-event")
-                || path.equals("/api/v1/payments/momo/ipn")
-                || path.equals("/api/v1/payments/momo/unbind");
+                || path.equals("/api/public/twilio/voice-alert")
+                || path.equals("/api/v1/payments/vnpay/ipn");
     }
 
     @Override

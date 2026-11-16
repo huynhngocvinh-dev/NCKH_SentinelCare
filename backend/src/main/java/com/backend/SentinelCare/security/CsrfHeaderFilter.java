@@ -21,9 +21,9 @@ public class CsrfHeaderFilter extends OncePerRequestFilter {
         return SAFE_METHODS.contains(request.getMethod())
                 || path.equals("/api/incidents/webhook/camera") // xác thực bằng X-Device-Key
                 || path.equals("/api/incidents/iot-event") // xác thực bằng X-Device-Key
-                || path.startsWith("/ws-sentinel") // WebSocket đã kiểm tra Origin
-                || path.equals("/api/v1/payments/momo/ipn") // xác thực bằng chữ ký HMAC của MoMo
-                || path.equals("/api/v1/payments/momo/unbind");
+                || path.startsWith("/api/public/twilio/") // webhook từ Twilio gọi vào (xác thực bằng chữ ký)
+                || path.startsWith("/api/v1/payments/") // webhook/IPN từ cổng thanh toán gọi vào
+                || path.startsWith("/ws-sentinel"); // WebSocket đã kiểm tra Origin
     }
 
     @Override

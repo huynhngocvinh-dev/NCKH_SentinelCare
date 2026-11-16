@@ -58,7 +58,7 @@ public class SubscriptionSupport {
             try {
                 messagingTemplate.convertAndSendToUser(user.getEmail(), "/queue/subscription", payload);
             } catch (Exception e) {
-                log.warn("Không đẩy được sự kiện gói dịch vụ cho user {}: {}", user.getId(), e.getMessage());
+                log.warn("Khong day duoc su kien goi dich vu cho user {}: {}", user.getId(), e.getMessage());
             }
         };
 

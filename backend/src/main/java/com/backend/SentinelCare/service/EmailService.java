@@ -4,7 +4,6 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -64,9 +63,9 @@ public class EmailService {
         }
     }
 
-    // Thêm tham số incidentId và nút bấm XÁC NHẬN ngắt gọi GSM ngay trong Email
+    // Email cảnh báo kèm nút XÁC NHẬN (chỉ ghi nhận, không dừng cuộc gọi)
     @Async
-    public void sendEmergencyAlertEmail(String toEmail, String alertText, byte[] audioBytes, Long incidentId) {
+    public void sendEmergencyAlertEmail(String toEmail, String alertText, Long incidentId) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -93,26 +92,21 @@ public class EmailService {
                                     <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
 
                                     <p style="font-size: 13px; color: #64748b; margin-bottom: 24px;">
-                                        Hệ thống đã tự động tạo âm thanh giọng nói đọc nội dung thông báo và đính kèm bên dưới. Vui lòng mở file nghe hoặc bấm nút bên dưới để ngắt cuộc gọi khẩn cấp!
+                                        Hệ thống đã gửi cảnh báo này tới các người thân được đăng ký. Vui lòng kiểm tra tình trạng ngay và bấm nút bên dưới để xác nhận bạn đã nắm thông tin.
                                     </p>
 
                                     <!-- NÚT BẤM XÁC NHẬN CHUẨN GIAO DIỆN -->
                                     <div style="text-align: center; margin: 28px 0 12px 0;">
                                         <a href="%s" style="background-color: #2563eb; color: #ffffff; padding: 14px 32px; text-decoration: none; font-size: 15px; font-weight: 600; border-radius: 50px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);">
-                                            XÁC NHẬN ĐÃ ĐỌC (HỦY CUỘC GỌI)
+                                            XÁC NHẬN ĐÃ NHẬN TIN
                                         </a>
                                     </div>
                                 </div>
                             </div>
                             """,
-                    alertText, acknowledgeUrl);
+                    HtmlUtils.htmlEscape(alertText), acknowledgeUrl);
 
             helper.setText(htmlContent, true);
-
-            // Đính kèm file MP3 nếu tạo audio thành công
-            if (audioBytes != null && audioBytes.length > 0) {
-                helper.addAttachment("CanhBaoKhanCap.mp3", new ByteArrayResource(audioBytes), "audio/mpeg");
-            }
 
             mailSender.send(message);
             log.info("[EMAIL ALERT SENT] da gui canh bao toi : {}", toEmail);
@@ -183,11 +177,12 @@ public class EmailService {
         sendSubscriptionMail(toEmail,
                 "[SentinelCare] Thanh toán gia hạn không thành công",
                 "Thanh toán không thành công", fullName,
-                "Chúng tôi không thể trừ <strong>" + formatMoney(amount) + "</strong> để gia hạn gói <strong>"
-                        + HtmlUtils.htmlEscape(packageName) + "</strong>.<br/>Nguyên nhân: <strong>"
+                "Giao dịch <strong>" + formatMoney(amount) + "</strong> để gia hạn gói <strong>"
+                        + HtmlUtils.htmlEscape(packageName) + "</strong> không thành công.<br/>Nguyên nhân: <strong>"
                         + HtmlUtils.htmlEscape(reason == null ? "Không xác định" : reason) + "</strong>.<br/><br/>"
-                        + "Bạn vẫn được giữ nguyên quyền lợi đến hết <strong>" + graceUntil.format(DATE_FMT),
-                "Thanh toán lại ngay.");
+                        + "Bạn vẫn được giữ nguyên quyền lợi đến hết <strong>" + graceUntil.format(DATE_FMT)
+                        + "</strong>. Hãy thanh toán lại để tránh bị hạ về gói Miễn phí.",
+                "Thanh toán lại ngay");
     }
 
     @Async
@@ -227,7 +222,7 @@ public class EmailService {
 
             helper.setText(html, true);
             mailSender.send(message);
-            log.info("[EMAIL SENT] email gói dịch vụ '{}' tới {}", heading, toEmail);
+            log.info("[EMAIL SENT] email goi dich vu '{}' toi {}", heading, toEmail);
         } catch (MessagingException e) {
             log.error("loi khi gui email goi dich vu toi {}: ", toEmail, e);
         }

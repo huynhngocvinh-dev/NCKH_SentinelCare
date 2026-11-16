@@ -45,16 +45,16 @@ public class IncidentController {
     public ResponseEntity<?> receiveCameraWebhook(
             @RequestHeader(value = "X-Device-Key", required = false) String deviceKey,
             @Valid @RequestBody CameraWebhookRequest request) {
-        if (!isValidDeviceKey(deviceKey)) return unauthorizedDevice();
+        if (!isValidDeviceKey(deviceKey))
+            return unauthorizedDevice();
 
         FallIncident incident = incidentEngineService.processCameraWebhook(request);
 
         return ResponseEntity.ok(Map.of(
-            "message", "Tiếp nhận tín hiệu Camera AI thành công. Đã kích hoạt đếm ngược 25s!",
-            "incidentId", incident.getId(),
-            "status", incident.getStatus().name(),
-            "cameraCode", request.getCameraCode() != null ? request.getCameraCode() : "CAM_DEFAULT"
-        ));
+                "message", "Tiếp nhận tín hiệu Camera AI thành công.",
+                "incidentId", incident.getId(),
+                "status", incident.getStatus().name(),
+                "cameraCode", request.getCameraCode() != null ? request.getCameraCode() : "CAM_DEFAULT"));
     }
 
     // UC-02 & UC-04: REST API tiếp nhận từ IoT Band (xác thực bằng X-Device-Key)
@@ -62,28 +62,27 @@ public class IncidentController {
     public ResponseEntity<?> receiveIotEvent(
             @RequestHeader(value = "X-Device-Key", required = false) String deviceKey,
             @Valid @RequestBody IotEventRequest request) {
-        if (!isValidDeviceKey(deviceKey)) return unauthorizedDevice();
+        if (!isValidDeviceKey(deviceKey))
+            return unauthorizedDevice();
 
         FallIncident incident = incidentEngineService.processIotEvent(request);
 
         if (incident == null) {
             return ResponseEntity.ok(Map.of(
-                "message", "Sự kiện " + request.getEventType() + " đã được xử lý thành công"
-            ));
+                    "message", "Sự kiện " + request.getEventType() + " đã được xử lý thành công"));
         }
 
         return ResponseEntity.ok(Map.of(
-            "message", "Tiếp nhận tín hiệu IoT Band thành công!",
-            "incidentId", incident.getId(),
-            "status", incident.getStatus().name(),
-            "deviceSerial", request.getDeviceSerial()
-        ));
+                "message", "Tiếp nhận tín hiệu IoT Band thành công. kích hoạt đếm ngược 25s!",
+                "incidentId", incident.getId(),
+                "status", incident.getStatus().name(),
+                "deviceSerial", request.getDeviceSerial()));
     }
 
     // Xác nhận qua LINK TRONG EMAIL (không cần đăng nhập, bắt buộc token ký hợp lệ)
     @GetMapping("/{id}/acknowledge")
     public ResponseEntity<?> acknowledgeByEmailLink(@PathVariable Long id,
-                                                    @RequestParam(required = false) String token) {
+            @RequestParam(required = false) String token) {
         if (!ackTokenService.verify(id, token)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .header("Content-Type", "text/html; charset=UTF-8")
@@ -93,29 +92,30 @@ public class IncidentController {
         incidentEngineService.acknowledgeIncident(id);
 
         String htmlResponse = """
-            <!DOCTYPE html>
-            <html lang="vi">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Xác nhận sự cố - SentinelCare</title>
-            </head>
-            <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
-                <div style="background-color: #ffffff; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); text-align: center; max-width: 480px; width: 90%%;">
-                    <div style="background-color: #dcfce7; color: #16a34a; width: 80px; height: 80px; border-radius: 50%%; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 20px auto;">
-                        ✓
+                <!DOCTYPE html>
+                <html lang="vi">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Xác nhận sự cố - SentinelCare</title>
+                </head>
+                <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f1f5f9; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
+                    <div style="background-color: #ffffff; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); text-align: center; max-width: 480px; width: 90%%;">
+                        <div style="background-color: #dcfce7; color: #16a34a; width: 80px; height: 80px; border-radius: 50%%; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 20px auto;">
+                            ✓
+                        </div>
+                        <h2 style="color: #15803d; margin: 0 0 10px 0; font-size: 22px;">ĐÃ XÁC NHẬN SỰ CỐ</h2>
+                        <p style="color: #334155; font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
+                            Hệ thống <strong>SentinelCare</strong> đã ghi nhận phản hồi xác nhận cho sự cố té ngã mã số <strong>#%d</strong>.
+                        </p>
+                        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; color: #166534; font-size: 14px; font-weight: 600;">
+                            ✅ Hệ thống đã ghi nhận bạn đã nắm thông tin sự cố.
+                        </div>
                     </div>
-                    <h2 style="color: #15803d; margin: 0 0 10px 0; font-size: 22px;">ĐÃ XÁC NHẬN SỰ CỐ</h2>
-                    <p style="color: #334155; font-size: 15px; line-height: 1.6; margin-bottom: 20px;">
-                        Hệ thống <strong>SentinelCare</strong> đã ghi nhận phản hồi xác nhận cho sự cố té ngã mã số <strong>#%d</strong>.
-                    </p>
-                    <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; color: #166534; font-size: 14px; font-weight: 600;">
-                        📞 Lập tức HỦY toàn bộ quy trình gọi điện GSM khẩn cấp!
-                    </div>
-                </div>
-            </body>
-            </html>
-            """.formatted(id);
+                </body>
+                </html>
+                """
+                .formatted(id);
 
         return ResponseEntity.ok()
                 .header("Content-Type", "text/html; charset=UTF-8")
@@ -134,13 +134,13 @@ public class IncidentController {
 
         incidentEngineService.acknowledgeIncident(id);
         return ResponseEntity.ok(Map.of(
-            "message", "Đã ghi nhận xác nhận từ người thân. Hủy cuộc gọi leo thang.",
-            "incidentId", id,
-            "status", "ACKNOWLEDGED"
-        ));
+                "message", "Da ghi nhan xac nhan tu nguoi than.",
+                "incidentId", id,
+                "status", "ACKNOWLEDGED"));
     }
 
-    // UC-06: Lịch sử sự cố CỦA TÀI KHOẢN ĐANG ĐĂNG NHẬP, có phân trang (?page=0&size=10)
+    // UC-06: Lịch sử sự cố CỦA TÀI KHOẢN ĐANG ĐĂNG NHẬP, có phân trang
+    // (?page=0&size=10)
     @GetMapping("/history")
     public ResponseEntity<Map<String, Object>> getIncidentHistory(
             Authentication authentication,
@@ -174,21 +174,22 @@ public class IncidentController {
                     .id(inc.getId())
                     .incidentTimeFormatted(inc.getIncidentTime() != null ? inc.getIncidentTime().format(formatter) : "")
                     .detectionSource(source)
-                    .patientName(inc.getPatient() != null ? inc.getPatient().getFullName() : "Chưa định danh (Camera AI)")
+                    .patientName(
+                            inc.getPatient() != null ? inc.getPatient().getFullName() : "Chưa định danh (Camera AI)")
                     .locationAddress(location)
                     .status(inc.getStatus().name())
-                    .callEscalationStatus(inc.getCallEscalationStatus() != null ? inc.getCallEscalationStatus().name() : null)
+                    .callEscalationStatus(
+                            inc.getCallEscalationStatus() != null ? inc.getCallEscalationStatus().name() : null)
                     .snapshotUrl(inc.getSnapshotUrl())
                     .build();
         }).toList();
 
         return ResponseEntity.ok(Map.of(
-            "content", content,
-            "page", result.getNumber(),
-            "size", result.getSize(),
-            "totalElements", result.getTotalElements(),
-            "totalPages", result.getTotalPages()
-        ));
+                "content", content,
+                "page", result.getNumber(),
+                "size", result.getSize(),
+                "totalElements", result.getTotalElements(),
+                "totalPages", result.getTotalPages()));
     }
 
     // ---------- Hàm hỗ trợ ----------
@@ -201,7 +202,8 @@ public class IncidentController {
     }
 
     private boolean isValidDeviceKey(String provided) {
-        if (deviceApiKey == null || deviceApiKey.isBlank() || provided == null) return false;
+        if (deviceApiKey == null || deviceApiKey.isBlank() || provided == null)
+            return false;
         return MessageDigest.isEqual(
                 deviceApiKey.getBytes(StandardCharsets.UTF_8),
                 provided.getBytes(StandardCharsets.UTF_8));

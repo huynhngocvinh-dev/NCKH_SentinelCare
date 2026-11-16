@@ -28,7 +28,7 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .setSubject(phoneNumber)
-                .claim("role", role) 
+                .claim("role", role)
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -61,7 +61,7 @@ public class JwtTokenProvider {
             Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
         } catch (JwtException | IllegalArgumentException ex) {
-            System.err.println("Lỗi xác thực JWT: " + ex.getMessage());
+            System.err.println("Loi xac thuc JWT: " + ex.getMessage());
         }
         return false;
     }

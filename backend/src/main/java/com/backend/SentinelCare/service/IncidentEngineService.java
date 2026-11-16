@@ -7,9 +7,11 @@ import com.backend.SentinelCare.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -28,13 +30,15 @@ public class IncidentEngineService {
     private final IncidentFusionService fusionService;
     private final IncidentNotificationService notificationService;
     private final IncidentTimerService timerService;
+    private final TransactionTemplate txTemplate;
 
     // 1. TIẾP NHẬN CAMERA WEBHOOK: Bỏ qua đếm ngược 25s, cảnh báo ngay
     @Transactional
     public FallIncident processCameraWebhook(CameraWebhookRequest request) {
         String camCode = request.getCameraCode() != null ? request.getCameraCode() : "CAM_DEFAULT";
 
-        // Camera phải được đăng ký trước (gắn với địa chỉ của 1 tài khoản), không tự tạo camera
+        // Camera phải được đăng ký trước (gắn với địa chỉ của 1 tài khoản), không tự
+        // tạo camera
         CameraDevice camera = cameraDeviceRepository.findByCameraCode(camCode)
                 .orElseThrow(() -> new RuntimeException(
                         "Camera '" + camCode + "' chưa được đăng ký với tài khoản nào!"));
@@ -47,9 +51,9 @@ public class IncidentEngineService {
         incident.setCallEscalationStatus(FallIncident.CallEscalationStatus.CALL_NOT_STARTED);
         incident = incidentRepository.save(incident);
 
-        log.warn("🚨 [CAMERA AI] Phát hiện té ngã! Bắt đầu phát cảnh báo ngay lập tức.");
+        log.warn("[CAMERA AI] Phat hien te nga! Bat dau phat canh bao ngay lap tuc.");
         triggerEscalationWorkflow(incident);
-        
+
         return incident;
     }
 
@@ -58,13 +62,13 @@ public class IncidentEngineService {
     public FallIncident processIotEvent(IotEventRequest request) {
         Optional<IotDevice> deviceOpt = iotDeviceRepository.findByDeviceSerial(request.getDeviceSerial());
         if (deviceOpt.isEmpty()) {
-            log.warn("⚠️ Thiết bị IoT chưa đăng ký: {}", request.getDeviceSerial());
+            log.warn("Thiet bi IoT chua dang ky: {}", request.getDeviceSerial());
             return null;
         }
 
         IotDevice device = deviceOpt.get();
 
-        // Mọi tín hiệu từ thiết bị đều cập nhật trạng thái kết nối và pin 
+        // Mọi tín hiệu từ thiết bị đều cập nhật trạng thái kết nối và pin
         updateDeviceStatus(device, request);
 
         // Tín hiệu định kỳ (không phải sự cố): chỉ cập nhật trạng thái thiết bị
@@ -82,8 +86,9 @@ public class IncidentEngineService {
         }
 
         // TH2: Bấm 1 lần xác nhận ngã / Bấm SOS
-        if ("SOS_NOW".equalsIgnoreCase(request.getEventType()) || "CONFIRM_NOW".equalsIgnoreCase(request.getEventType())) {
-            log.info("🆘 Bệnh nhân bấm xác nhận ngã/SOS trên thiết bị!");
+        if ("SOS_NOW".equalsIgnoreCase(request.getEventType())
+                || "CONFIRM_NOW".equalsIgnoreCase(request.getEventType())) {
+            log.info("Benh nhan da bam xac nhan nga/SOS tren thiet bi!");
             return triggerImmediateSos(device, patient, request.getLatitude(), request.getLongitude());
         }
 
@@ -103,43 +108,56 @@ public class IncidentEngineService {
 
     // 3. CỬA SỔ XÁC MINH 25 GIÂY CHO IOT (không chặn luồng, chạy qua bộ hẹn giờ)
     public void trigger25sIotVerificationWindow(Long incidentId) {
-        log.info(" [IOT DEVICE] bat dau dem nguoc 25s cho su co ID {}...", incidentId);
+        log.info("[IOT DEVICE] bat dau dem nguoc 25s cho su co ID {}...", incidentId);
         timerService.runAfter(25, "IoT-25s-" + incidentId, () -> handleIotTimeout(incidentId));
     }
 
     private void handleIotTimeout(Long incidentId) {
-        incidentRepository.findById(incidentId).ifPresent(incident -> {
+        txTemplate.executeWithoutResult(tx -> incidentRepository.findById(incidentId).ifPresent(incident -> {
             if (incident.getStatus() == FallIncident.IncidentStatus.PENDING) {
                 incident.setStatus(FallIncident.IncidentStatus.CONFIRMED_FALL);
                 incidentRepository.save(incident);
-
-                log.warn(" [IOT 25S TIMEOUT] het 25s khong bam huy. bat dau canh bao!");
+                log.warn("[IOT 25S TIMEOUT] het 25s khong bam huy. bat dau canh bao!");
                 triggerEscalationWorkflow(incident);
             }
-        });
+        }));
     }
 
-    // 4. API XÁC NHẬN TỪ NGƯỜI THÂN (Dừng leo thang cuộc gọi)
+    // xác nhận chỉ đổi status, không đụng tới cuộc gọi
     @Transactional
     public void acknowledgeIncident(Long incidentId) {
-        Optional<FallIncident> incidentOpt = incidentRepository.findById(incidentId);
-        if (incidentOpt.isPresent()) {
-            FallIncident incident = incidentOpt.get();
-            incident.setStatus(FallIncident.IncidentStatus.ACKNOWLEDGED);
-            // Dừng tiến trình gọi
-            incident.setCallEscalationStatus(FallIncident.CallEscalationStatus.ESCALATION_STOPPED);
-            incidentRepository.save(incident);
-            log.info(" da xac nhan su co ID: {}. da khoa cuoc goi leo thang!", incidentId);
-        }
+        incidentRepository.findById(incidentId)
+                .filter(i -> i.getStatus() == FallIncident.IncidentStatus.CONFIRMED_FALL)
+                .ifPresent(i -> {
+                    i.setStatus(FallIncident.IncidentStatus.ACKNOWLEDGED);
+                    incidentRepository.save(i);
+                    log.info("da xac nhan su co ID: {}. Cuoc goi nguoi than van tiep tuc.", incidentId);
+                    runAfterCommit(() -> notificationService.publishStatusUpdate(i));
+                });
     }
 
     private void triggerEscalationWorkflow(FallIncident incident) {
-        String alertText = fusionService.buildCompositeAlertText(incident);
-        notificationService.dispatchImmediateNotifications(incident, alertText);
+        String emailText = fusionService.buildCompositeAlertText(incident);
+        String voiceText = fusionService.buildVoiceAlertText(incident);
+        runAfterCommit(() -> notificationService.dispatchImmediateNotifications(incident, emailText, voiceText));
+    }
+
+    private void runAfterCommit(Runnable task) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    task.run();
+                }
+            });
+        } else {
+            task.run();
+        }
     }
 
     private void cancelActiveIncident(Long patientId) {
-        if (patientId == null) return;
+        if (patientId == null)
+            return;
         Optional<FallIncident> pendingOpt = incidentRepository.findFirstByPatientIdAndStatusOrderByIncidentTimeDesc(
                 patientId, FallIncident.IncidentStatus.PENDING);
 
@@ -153,7 +171,8 @@ public class IncidentEngineService {
     }
 
     private void sendAlertSignalToIotDevice(String deviceSerial) {
-        log.warn(" [IOT] Chua tich hop kenh gui lenh coi/rung xuong thiet bi {} (can MQTT/HTTP phia firmware).", deviceSerial);
+        log.warn(" [IOT] Chua tich hop kenh gui lenh coi/rung xuong thiet bi {} (can MQTT/HTTP phia firmware).",
+                deviceSerial);
     }
 
     private FallIncident triggerImmediateSos(IotDevice device, MonitoredSubject patient, Double lat, Double lng) {

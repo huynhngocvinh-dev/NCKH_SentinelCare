@@ -16,6 +16,11 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import com.backend.SentinelCare.exception.BusinessException;
+import com.backend.SentinelCare.util.FeatureCodes;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+
 @Service
 @RequiredArgsConstructor
 public class EmergencyContactService {
@@ -23,8 +28,13 @@ public class EmergencyContactService {
     private final EmergencyContactRepository contactRepository;
     private final AccountRepository accountRepository;
     private final UserProfileRepository userProfileRepository;
+    private final SubscriptionService subscriptionService;
 
-    // 1. LẤY DANH SÁCH (xếp theo ưu tiên) - tự đảm bảo chủ tài khoản luôn có trong danh sách
+    @Value("${contacts.free-limit:2}")
+    private int freeContactLimit;
+
+    // 1. LẤY DANH SÁCH (xếp theo ưu tiên) - tự đảm bảo chủ tài khoản luôn có trong
+    // danh sách
     @Transactional
     public List<EmergencyContactResponse> getContacts(String identifier) {
         Account account = resolveAccount(identifier);
@@ -33,14 +43,16 @@ public class EmergencyContactService {
                 .stream().map(this::toResponse).toList();
     }
 
-    // 2. CHỦ TÀI KHOẢN LUÔN LÀ NGƯỜI ƯU TIÊN 1 (gọi khi đăng ký và khi tải danh sách)
+    // 2. CHỦ TÀI KHOẢN LUÔN LÀ NGƯỜI ƯU TIÊN 1 (gọi khi đăng ký và khi tải danh
+    // sách)
     @Transactional
     public EmergencyContact ensureOwnerContact(Account account) {
-        List<EmergencyContact> contacts =
-                new ArrayList<>(contactRepository.findByAccountIdOrderByPriorityOrderAsc(account.getId()));
+        List<EmergencyContact> contacts = new ArrayList<>(
+                contactRepository.findByAccountIdOrderByPriorityOrderAsc(account.getId()));
 
         for (EmergencyContact c : contacts) {
-            if (c.isAccountOwner()) return c;
+            if (c.isAccountOwner())
+                return c;
         }
 
         String fullName = userProfileRepository.findByAccountId(account.getId())
@@ -74,12 +86,26 @@ public class EmergencyContactService {
         String name = request.getFullName().trim();
         String email = blankToNull(request.getEmail());
 
-        // Nếu SĐT thuộc tài khoản đã đăng ký: lấy thông tin thật từ hệ thống, không tin dữ liệu client
+        // Nếu SĐT thuộc tài khoản đã đăng ký: lấy thông tin thật từ hệ thống, không tin
+        // dữ liệu client
         Optional<Account> linked = accountRepository.findByPhoneNumber(phone);
         if (linked.isPresent()) {
             name = userProfileRepository.findByAccountId(linked.get().getId())
                     .map(UserProfile::getFullName).orElse(name);
             email = linked.get().getEmail();
+        }
+
+        if (EmergencyVoiceCallService.toE164(phone) == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "INVALID_PHONE", "Số điện thoại không hợp lệ.");
+        }
+
+        // Không tính chủ tài khoản vào hạn mức
+        long others = contactRepository.countByAccountIdAndAccountOwnerFalse(account.getId());
+        if (others >= freeContactLimit
+                && !subscriptionService.hasFeatureAccess(account.getId(), FeatureCodes.ADD_RELATIVE)) {
+            throw new BusinessException(HttpStatus.FORBIDDEN, "CONTACT_LIMIT_REACHED",
+                    "Gói hiện tại chỉ thêm tối đa " + freeContactLimit
+                            + " người thân. Nâng cấp Pro/Premium để thêm không giới hạn.");
         }
 
         EmergencyContact contact = EmergencyContact.builder()
@@ -88,12 +114,13 @@ public class EmergencyContactService {
                 .phoneNumber(phone)
                 .email(email)
                 .relationship(blankToNull(request.getRelationship()) != null
-                        ? request.getRelationship().trim() : "Người thân")
+                        ? request.getRelationship().trim()
+                        : "Người thân")
                 .accountOwner(false)
                 .build();
 
-        List<EmergencyContact> contacts =
-                new ArrayList<>(contactRepository.findByAccountIdOrderByPriorityOrderAsc(account.getId()));
+        List<EmergencyContact> contacts = new ArrayList<>(
+                contactRepository.findByAccountIdOrderByPriorityOrderAsc(account.getId()));
         insertAt(contacts, contact, request.getPriorityOrder());
         return toResponse(contact);
     }
@@ -120,8 +147,8 @@ public class EmergencyContactService {
     @Transactional
     public void deleteContact(Long id, String identifier) {
         Account account = resolveAccount(identifier);
-        List<EmergencyContact> contacts =
-                new ArrayList<>(contactRepository.findByAccountIdOrderByPriorityOrderAsc(account.getId()));
+        List<EmergencyContact> contacts = new ArrayList<>(
+                contactRepository.findByAccountIdOrderByPriorityOrderAsc(account.getId()));
 
         EmergencyContact target = contacts.stream()
                 .filter(c -> c.getId().equals(id))

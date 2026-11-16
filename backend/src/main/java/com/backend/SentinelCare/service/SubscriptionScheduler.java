@@ -28,13 +28,13 @@ public class SubscriptionScheduler {
     public void processRenewals() {
         List<Long> ids = subscriptionRepository.findDueIds(Utc.now());
         if (!ids.isEmpty()) {
-            log.info("[BILLING] {} gói đến hạn cần xử lý", ids.size());
+            log.info("[BILLING] {} goi den han can xu ly", ids.size());
         }
         for (Long id : ids) {
             try {
                 billingService.processDue(id);
             } catch (Exception e) {
-                log.error("[BILLING] Lỗi xử lý gói {}", id, e);
+                log.error("[BILLING] Loi xu ly goi {}", id, e);
             }
         }
     }
@@ -48,7 +48,7 @@ public class SubscriptionScheduler {
             try {
                 billingService.sendReminder(id);
             } catch (Exception e) {
-                log.error("[BILLING] Lỗi gửi nhắc gia hạn cho gói {}", id, e);
+                log.error("[BILLING] Loi gui nhac gia han cho goi {}", id, e);
             }
         }
     }
@@ -59,9 +59,9 @@ public class SubscriptionScheduler {
         try {
             int count = billingService.cancelStaleInvoices();
             if (count > 0)
-                log.info("[BILLING] Đã hủy {} hóa đơn bỏ dở", count);
+                log.info("[BILLING] Da huy {} hoa don bo do", count);
         } catch (Exception e) {
-            log.error("[BILLING] Lỗi dọn hóa đơn treo", e);
+            log.error("[BILLING] Loi don hoa don treo", e);
         }
     }
 }

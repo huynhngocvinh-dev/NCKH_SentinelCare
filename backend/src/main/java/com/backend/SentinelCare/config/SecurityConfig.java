@@ -72,16 +72,19 @@ public class SecurityConfig {
                                 "/api/incidents/iot-event")
                         .permitAll()
 
-                        // Link xác nhận trong email: xác thực bằng token ký HMAC
-                        .requestMatchers(HttpMethod.GET, "/api/v1/subscriptions/plans").permitAll()
-                        // Webhook MoMo (IPN, thông báo hủy liên kết): xác thực bằng chữ ký HMAC trong
-                        // controller
-                        .requestMatchers(HttpMethod.POST, "/api/v1/payments/momo/ipn", "/api/v1/payments/momo/unbind")
-                        .permitAll()
-
                         .requestMatchers(HttpMethod.GET, "/api/subscriptions/packages").permitAll()
                         .requestMatchers("/api/admin/packages/**").hasRole("ADMIN")
+                        // Link xác nhận trong email: xác thực bằng token ký HMAC trong controller
+                        .requestMatchers(HttpMethod.GET, "/api/incidents/*/acknowledge").permitAll()
 
+                        // Twilio gọi vào lấy nội dung cuộc gọi: xác thực bằng chữ ký + hạn dùng trong
+                        // controller
+                        .requestMatchers("/api/public/twilio/**").permitAll()
+
+                        // IPN của VNPAY: xác thực bằng chữ ký trong controller
+                        .requestMatchers(HttpMethod.GET, "/api/v1/payments/vnpay/ipn").permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/v1/subscriptions/plans").permitAll()
                         // Mọi endpoint còn lại (kể cả /ws-sentinel/**) bắt buộc đăng nhập
                         .anyRequest().authenticated())
 
