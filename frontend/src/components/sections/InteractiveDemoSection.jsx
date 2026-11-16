@@ -1,3 +1,4 @@
+// InteractiveDemoSection.jsx
 import { useState } from "react";
 import { FiCheckCircle, FiAlertTriangle, FiShieldOff } from "react-icons/fi";
 import { toast } from "react-toastify";
@@ -13,65 +14,52 @@ export default function InteractiveDemoSection() {
   };
 
   return (
-    <section
-      id="demo-live"
-      className="py-16 bg-slate-50 border-t border-slate-100"
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <div>
-          <span className="text-xs font-bold text-blue-600 uppercase tracking-widest">
-            TRẢI NGHIỆM TƯƠNG TÁC TRỰC TIẾP
+    <section id="demo-live" className="py-24 bg-[#eaf3ff]">
+      <div className="max-w-[1240px] mx-auto px-6 sm:px-10 space-y-8">
+        <div className="reveal">
+          <span className="text-[10px] tracking-[2.2px] uppercase text-[#1469db] font-bold">
+            06 — TRẢI NGHIỆM TƯƠNG TÁC TRỰC TIẾP
           </span>
-          <h2 className="text-3xl font-black text-slate-900 mt-1">
-            Giả Lập Tình Huống Kích Hoạt Đa Luồng
+          <h2 className="font-editorial text-4xl sm:text-6xl text-[#071a36] mt-2 leading-[1.05]">
+            Giả lập tình huống{" "}
+            <em className="text-[#1469db] italic">đối soát đa luồng.</em>
           </h2>
-          <p className="text-slate-600 text-sm mt-1">
-            Nhấp vào một trong các kịch bản thử nghiệm bên dưới để quan sát phản
-            xa xử lý tức thì của Engine AI.
+          <p className="text-slate-600 text-sm mt-2">
+            Chọn một kịch bản thử nghiệm bên dưới để quan sát phản xạ xử lý chéo
+            giữa IMU và Vision AI.
           </p>
         </div>
 
         {/* Scenario Switchers */}
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => handleSelectScenario("relax")}
-            className={`px-5 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeScenarioKey === "relax"
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-white text-slate-700 border border-slate-200"
-            }`}
-          >
-            <span>🏃 Kịch Bản 1: Ngồi Thư Giãn</span>
-          </button>
-          <button
-            onClick={() => handleSelectScenario("drop")}
-            className={`px-5 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeScenarioKey === "drop"
-                ? "bg-blue-600 text-white shadow-md"
-                : "bg-white text-slate-700 border border-slate-200"
-            }`}
-          >
-            <span>📢 Kịch Bản 2: Rơi Thiết Bị</span>
-          </button>
-          <button
-            onClick={() => handleSelectScenario("fall")}
-            className={`px-5 py-3 rounded-xl font-bold text-sm transition-all flex items-center gap-2 cursor-pointer ${
-              activeScenarioKey === "fall"
-                ? "bg-red-600 text-white shadow-md"
-                : "bg-white text-slate-700 border border-slate-200"
-            }`}
-          >
-            <span>🚨 Kịch Bản 3: Té Ngã Khẩn Cấp</span>
-          </button>
+        <div className="flex flex-wrap gap-3 reveal delay-1">
+          {[
+            { key: "relax", label: "Kịch Bản 1: Ngồi Thư Giãn" },
+            { key: "drop", label: "Kịch Bản 2: Rơi Thiết Bị" },
+            { key: "fall", label: "Kịch Bản 3: Té Ngã Khẩn Cấp", danger: true },
+          ].map((btn) => (
+            <button
+              key={btn.key}
+              onClick={() => handleSelectScenario(btn.key)}
+              className={`px-5 py-3.5 rounded-full font-bold text-xs tracking-wide transition-all cursor-pointer ${
+                activeScenarioKey === btn.key
+                  ? btn.danger
+                    ? "bg-rose-600 text-white shadow-lg"
+                    : "bg-[#071a36] text-white shadow-lg"
+                  : "bg-white text-[#071a36] border border-[#125bae]/15 hover:bg-blue-50"
+              }`}
+            >
+              {btn.label}
+            </button>
+          ))}
         </div>
 
         {/* Dynamic Display Panel */}
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">
-              TRẠNG THÁI IMU ĐEO TAY
+        <div className="grid md:grid-cols-3 gap-6 reveal delay-2">
+          <div className="bg-white p-7 rounded-[26px] border border-[#125bae]/10 shadow-sm space-y-2.5">
+            <span className="text-[10px] font-bold tracking-[1.5px] text-slate-400 uppercase">
+              LUỒNG 1 • IMU ĐEO TAY
             </span>
-            <h4 className="font-bold text-slate-900 text-base">
+            <h4 className="font-bold text-[#071a36] text-base">
               {scenario?.imuStatus}
             </h4>
             <p className="text-xs text-slate-600 leading-relaxed">
@@ -79,11 +67,11 @@ export default function InteractiveDemoSection() {
             </p>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 space-y-2">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">
-              TRẠNG THÁI VISION AI CAMERA
+          <div className="bg-white p-7 rounded-[26px] border border-[#125bae]/10 shadow-sm space-y-2.5">
+            <span className="text-[10px] font-bold tracking-[1.5px] text-slate-400 uppercase">
+              LUỒNG 2 • VISION EDGE AI
             </span>
-            <h4 className="font-bold text-slate-900 text-base">
+            <h4 className="font-bold text-[#071a36] text-base">
               {scenario?.visionStatus}
             </h4>
             <p className="text-xs text-slate-600 leading-relaxed">
@@ -92,20 +80,20 @@ export default function InteractiveDemoSection() {
           </div>
 
           <div
-            className={`p-6 rounded-2xl border space-y-2 ${
+            className={`p-7 rounded-[26px] border space-y-2.5 transition-colors ${
               scenario?.alertType === "danger"
-                ? "bg-red-50 border-red-200 text-red-900"
+                ? "bg-rose-50 border-rose-200 text-rose-950"
                 : scenario?.alertType === "warning"
-                ? "bg-amber-50 border-amber-200 text-amber-900"
-                : "bg-emerald-50 border-emerald-200 text-emerald-900"
+                ? "bg-amber-50 border-amber-200 text-amber-950"
+                : "bg-emerald-50 border-emerald-200 text-emerald-950"
             }`}
           >
-            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">
+            <span className="text-[10px] font-bold uppercase tracking-[1.5px] opacity-75">
               QUYẾT ĐỊNH CỦA HỆ THỐNG
             </span>
             <h4 className="font-extrabold text-base flex items-center gap-2">
               {scenario?.alertType === "danger" && (
-                <FiShieldOff className="w-5 h-5 text-red-600" />
+                <FiShieldOff className="w-5 h-5 text-rose-600" />
               )}
               {scenario?.alertType === "warning" && (
                 <FiAlertTriangle className="w-5 h-5 text-amber-600" />

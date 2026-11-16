@@ -21,9 +21,10 @@ export default function Footer() {
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+              {/* logo */}
+              {/* <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
                 <FiShield className="w-6 h-6 stroke-[2.5]" />
-              </div>
+              </div> */}
               <div>
                 <span className="text-2xl font-black tracking-tight text-white">
                   SentinelCare

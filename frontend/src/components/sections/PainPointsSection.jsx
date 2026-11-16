@@ -1,81 +1,117 @@
-
-import { FiClock, FiPhoneOff, FiEyeOff } from "react-icons/fi";
+import { FiClock, FiPhoneOff, FiEyeOff, FiArrowRight } from "react-icons/fi";
+import { EDITORIAL_IMAGES } from "../../constants/editorialImages";
 
 export default function PainPointsSection() {
+  const cards = [
+    {
+      index: "01",
+      tag: "QUY TẮC 30 PHÚT VÀNG",
+      title: "THỜI GIAN BẤT ĐỘNG",
+      desc: "Người cao tuổi nằm bất động sau té ngã quá 30 phút làm tăng tỷ lệ tử vong lên 50% do hạ thân nhiệt, hoại tử cơ và tổn thương thần kinh.",
+      source: "Geriatrics Journal",
+      image: EDITORIAL_IMAGES.interior,
+      icon: <FiClock className="w-4 h-4" />,
+    },
+    {
+      index: "02",
+      tag: "BẤT CẬP THIẾT BỊ ĐƠN LẺ",
+      title: "68% THÁO VÒNG SOS",
+      desc: "Vòng bấm nút đòi hỏi người ngã phải còn tỉnh táo; hơn 68% người cao tuổi tháo vòng khi ngủ hoặc tắm — lúc xác suất trượt ngã cao nhất.",
+      source: "Rủi ro bất tỉnh",
+      image: EDITORIAL_IMAGES.flowers,
+      icon: <FiPhoneOff className="w-4 h-4" />,
+    },
+    {
+      index: "03",
+      tag: "ĐIỂM MÙ CAMERA ĐỘC LẬP",
+      title: "KHU VỰC RIÊNG TƯ",
+      desc: "Camera đơn lẻ bị che khuất bởi đồ vật, nhầm lẫn nhiều người và không thể lắp đặt trong nhà tắm hay phòng thay đồ.",
+      source: "Bù trừ đa luồng",
+      image: EDITORIAL_IMAGES.care,
+      icon: <FiEyeOff className="w-4 h-4" />,
+    },
+  ];
+
   return (
-    <section className="py-16 bg-slate-50 border-t border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-3xl mb-12">
-          <span className="text-xs font-bold text-red-600 uppercase tracking-widest flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-red-600"></span>
-            TÍNH CẤP THIẾT Y TẾ & THỰC TRẠNG BỆNH NHÂN
-          </span>
-          <h2 className="text-3xl font-black text-slate-900 mt-2 leading-tight">
-            Té Ngã Ở Người Cao Tuổi: Kẻ Giết Người Thầm Lặng Sau ”Thời Gian
-            Vàng” Cứu Hộ
-          </h2>
-          <p className="text-slate-600 mt-3 text-sm sm:text-base leading-relaxed">
-            Theo Tổ chức Y tế Thế giới (WHO), té ngã là nguyên nhân gây tử vong
-            thứ hai do tai nạn thương tích không cố ý. Đối với người cao tuổi
-            sống neo đơn, sự nguy hiểm không chỉ đến từ cú ngã, mà nằm ở khoảng
-            thời gian nằm bất động mà không có ai phát hiện.
+    <section
+      id="thuc-trang"
+      className="py-28 text-white relative overflow-hidden"
+      style={{
+        background:
+          "radial-gradient(circle at 15% 30%, rgba(29, 121, 226, 0.34), transparent 28%), radial-gradient(circle at 88% 70%, rgba(61, 208, 236, 0.15), transparent 25%), #071b3b",
+      }}
+    >
+      <div className="max-w-[1240px] mx-auto px-6 sm:px-10">
+        {/* Top Editorial Header */}
+        <div className="grid lg:grid-cols-12 gap-8 items-start mb-16 reveal">
+          <p className="lg:col-span-4 text-[10px] tracking-[2.2px] uppercase text-[#86dff4] font-semibold">
+            01 — TÍNH CẤP THIẾT Y TẾ
           </p>
+          <h2 className="lg:col-span-8 font-editorial text-4xl sm:text-5xl lg:text-[58px] leading-[1.12] tracking-[-1.2px]">
+            Té ngã ở người cao tuổi: sự nguy hiểm nằm ở khoảng thời gian{" "}
+            <em className="text-[#8de6f7] italic">bất động</em> không ai{" "}
+            <em className="text-[#8de6f7] italic">phát hiện</em>.
+          </h2>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {/* Card 1 */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
-              <FiClock className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Quy Tắc 30 Phút Vàng
-            </h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Người cao tuổi nằm bất động sau té ngã quá 30 phút làm tăng tỷ lệ
-              tử vong lên <strong>50%</strong> do hạ thân nhiệt, hoại tử cơ
-              (rhabdomyolysis), mất nước và tổn thương thần kinh vĩnh viễn.
-            </p>
-            <div className="bg-red-50/50 text-red-700 text-xs px-3 py-2 rounded-lg font-medium border border-red-100">
-              Nguồn: Báo cáo Dịch tễ học Geriatrics Journal
-            </div>
-          </div>
+        {/* 3 Principle Image Cards */}
+        <div className="grid md:grid-cols-3 gap-5">
+          {cards.map((card, idx) => (
+            <article
+              key={card.index}
+              className={`group relative h-[490px] rounded-[28px] overflow-hidden border border-white/15 shadow-[0_28px_70px_rgba(0,13,38,0.35)] reveal delay-${
+                idx + 1
+              }`}
+            >
+              <img
+                src={card.image}
+                alt={card.title}
+                className="w-full h-full object-cover saturate-75 contrast-105 transition-transform duration-1000 ease-out group-hover:scale-105"
+              />
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:
+                    "linear-gradient(180deg, rgba(4,15,34,0.15) 20%, rgba(5,18,42,0.92) 100%)",
+                }}
+              />
 
-          {/* Card 2 */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-              <FiPhoneOff className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Bất Cập Thiết Bị Đơn Lẻ
-            </h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Vòng đeo SOS đòi hỏi người ngã phải còn tỉnh táo để bấm nút; hơn{" "}
-              <strong>68%</strong> người cao tuổi tháo vòng khi ngủ hoặc tắm -
-              chính là những lúc xác suất trượt chân ngã cao nhất.
-            </p>
-            <div className="bg-slate-100 text-slate-700 text-xs px-3 py-2 rounded-lg font-medium">
-              Rủi ro: Người bệnh bất tỉnh không thể bấm nút
-            </div>
-          </div>
+              <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
+                <span className="px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-[9px] tracking-[1.6px] uppercase text-sky-200">
+                  {card.tag}
+                </span>
+                <span className="w-9 h-9 rounded-full bg-white/10 backdrop-blur-md border border-white/20 grid place-items-center text-[#8de6f7]">
+                  {card.icon}
+                </span>
+              </div>
 
-          {/* Card 3 */}
-          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-              <FiEyeOff className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Điểm Mù Camera Độc Lập
-            </h3>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Camera thông thường bị vật cản (ghế, rèm cửa, góc tường), không
-              phân biệt được danh tính nếu nhà có nhiều người, và đặc biệt không
-              được lắp ở khu vực riêng tư như nhà tắm hay phòng thay đồ.
-            </p>
-            <div className="bg-blue-50 text-blue-700 text-xs px-3 py-2 rounded-lg font-medium border border-blue-100">
-              Giải pháp: Cảm biến bù trừ đa luồng thông minh SentinelCare
-            </div>
-          </div>
+              <div className="absolute left-7 right-7 bottom-7">
+                <span className="text-[10px] tracking-[2px] text-sky-300/80 font-mono">
+                  {card.index} / {card.source}
+                </span>
+                <h3 className="font-editorial text-3xl tracking-[-0.5px] mt-2 mb-3 text-white">
+                  {card.title}
+                </h3>
+                <p className="text-xs leading-relaxed text-white/75">
+                  {card.desc}
+                </p>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        {/* Bottom Editorial Note */}
+        <div className="mt-14 pt-8 border-t border-white/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 reveal">
+          <p className="font-editorial text-xl sm:text-2xl text-white/90 max-w-xl leading-snug">
+            SentinelCare kiến tạo chuẩn mực chăm sóc mới, nơi công nghệ hiện
+            diện thật khẽ nhưng bảo vệ trọn vẹn từng khoảnh khắc.
+          </p>
+          <a
+            href="#cong-nghe"
+            className="inline-flex items-center gap-4 pb-2 border-b border-white/50 text-[11px] tracking-[1.4px] uppercase text-white hover:text-[#8de6f7] hover:border-[#8de6f7] transition"
+          >
+            Kiến trúc đa luồng <FiArrowRight className="w-4 h-4" />
+          </a>
         </div>
       </div>
     </section>

@@ -51,7 +51,7 @@ export const authApi = {
 
 // API Quản lý Sự cố Khẩn cấp
 export const incidentApi = {
-  // Xác nhận sự cố (dừng leo thang cuộc gọi GSM)
+  // Xác nhận sự cố (chỉ ghi nhận đã nắm thông tin, không dừng cuộc gọi)
   acknowledge: (id) => api.post(`/incidents/${id}/acknowledge`),
   // Lịch sử sự cố của tài khoản đang đăng nhập (có phân trang)
   getHistory: (page = 0, size = 10) =>

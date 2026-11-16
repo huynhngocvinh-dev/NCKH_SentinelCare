@@ -6,38 +6,53 @@ import { useAuth } from "../context/AuthContext.jsx";
 const WS_URL =
   import.meta.env.VITE_WS_URL || "http://localhost:8080/ws-sentinel";
 
-export const useIncidentWebSocket = (onIncidentReceived) => {
+// Một kết nối STOMP dùng chung cho Navbar, IncidentModal... (đếm số nơi đang dùng)
+const listeners = new Set();
+let client = null;
+let users = 0;
+
+function connect() {
+  client = new Client({
+    webSocketFactory: () => new SockJS(WS_URL),
+    reconnectDelay: 5000,
+  });
+  client.onConnect = () => {
+    client.subscribe("/user/queue/incidents", (message) => {
+      if (!message.body) return;
+      let data;
+      try {
+        data = JSON.parse(message.body);
+      } catch {
+        return;
+      }
+      listeners.forEach((fn) => fn(data));
+    });
+  };
+  client.activate();
+}
+
+function disconnect() {
+  client?.deactivate();
+  client = null;
+}
+
+export const useIncidentWebSocket = (onMessage) => {
   const { isAuthenticated } = useAuth();
 
   // Giữ callback mới nhất mà không làm kết nối bị tạo lại mỗi lần render
-  const handlerRef = useRef(onIncidentReceived);
+  const handlerRef = useRef(onMessage);
   useEffect(() => {
-    handlerRef.current = onIncidentReceived;
-  }, [onIncidentReceived]);
+    handlerRef.current = onMessage;
+  }, [onMessage]);
 
   useEffect(() => {
-    // Chưa đăng nhập thì không kết nối
     if (!isAuthenticated) return;
-
-    // Trình duyệt tự gửi HttpOnly Cookie khi bắt tay WebSocket
-    const client = new Client({
-      webSocketFactory: () => new SockJS(WS_URL),
-      reconnectDelay: 5000,
-    });
-
-    client.onConnect = () => {
-      // Kênh riêng của tài khoản đang đăng nhập
-      client.subscribe("/user/queue/incidents", (message) => {
-        if (message.body) {
-          handlerRef.current?.(JSON.parse(message.body));
-        }
-      });
-    };
-
-    client.activate();
-
+    const listener = (data) => handlerRef.current?.(data);
+    listeners.add(listener);
+    if (users++ === 0) connect();
     return () => {
-      client.deactivate();
+      listeners.delete(listener);
+      if (--users === 0) disconnect();
     };
   }, [isAuthenticated]);
 };
